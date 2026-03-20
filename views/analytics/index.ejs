@@ -1,0 +1,136 @@
+<!-- views/analytics/index.ejs -->
+<div class="page-header">
+  <div>
+    <h2>Analytics</h2>
+    <p class="page-sub">Track your automation performance</p>
+  </div>
+  <div class="filter-tabs">
+    <a href="/analytics?days=7" class="tab-btn <%= days===7 ? 'active' : '' %>">7D</a>
+    <a href="/analytics?days=30" class="tab-btn <%= days===30 ? 'active' : '' %>">30D</a>
+    <a href="/analytics?days=90" class="tab-btn <%= days===90 ? 'active' : '' %>">90D</a>
+  </div>
+</div>
+
+<!-- Overview metrics -->
+<div class="stats-grid">
+  <div class="stat-card stat-purple">
+    <div class="stat-label">Total DMs Sent</div>
+    <div class="stat-value"><%= overview.total_sent || 0 %></div>
+    <div class="stat-icon">📤</div>
+  </div>
+  <div class="stat-card stat-green">
+    <div class="stat-label">DMs Received</div>
+    <div class="stat-value"><%= overview.total_received || 0 %></div>
+    <div class="stat-icon">📥</div>
+  </div>
+  <div class="stat-card stat-pink">
+    <div class="stat-label">Unique Contacts</div>
+    <div class="stat-value"><%= overview.unique_contacts || 0 %></div>
+    <div class="stat-icon">👥</div>
+  </div>
+  <div class="stat-card stat-orange">
+    <div class="stat-label">Automated Sends</div>
+    <div class="stat-value"><%= overview.automated_count || 0 %></div>
+    <div class="stat-icon">🤖</div>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <!-- DM Volume Chart -->
+  <div class="card">
+    <div class="card-header"><h3>Message Volume (<%= days %>d)</h3></div>
+    <div class="chart-container">
+      <canvas id="analyticsChart" height="140"></canvas>
+    </div>
+  </div>
+
+  <!-- Traffic Sources -->
+  <div class="card">
+    <div class="card-header"><h3>Event Breakdown</h3></div>
+    <% if (sourceBreakdown.length === 0) { %>
+    <div class="empty-state"><p>No events recorded yet.</p></div>
+    <% } else { %>
+    <% const total = sourceBreakdown.reduce((s, r) => s + parseInt(r.count), 0); %>
+    <% sourceBreakdown.slice(0, 6).forEach(s => { %>
+    <div class="source-bar-row">
+      <span class="source-label"><%= s.event_type.replace(/_/g,' ') %></span>
+      <div class="source-bar-track">
+        <div class="source-bar-fill" style="width:<%= total > 0 ? Math.round(s.count/total*100) : 0 %>%"></div>
+      </div>
+      <span class="source-count"><%= s.count %></span>
+    </div>
+    <% }) %>
+    <% } %>
+  </div>
+</div>
+
+<!-- Flow Performance Table -->
+<div class="card" style="margin-top:16px">
+  <div class="card-header"><h3>Flow Performance</h3></div>
+  <% if (flowStats.length === 0) { %>
+  <div class="empty-state"><p>No flow data yet.</p></div>
+  <% } else { %>
+  <table class="data-table">
+    <thead><tr>
+      <th>Flow Name</th><th>Triggered</th><th>Completed</th><th>Success Rate</th>
+    </tr></thead>
+    <tbody>
+      <% flowStats.forEach(f => { %>
+      <tr>
+        <td><%= f.name %></td>
+        <td><%= f.trigger_count %></td>
+        <td><%= f.success_count %></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="flex:1;height:6px;background:var(--surface3);border-radius:3px">
+              <div style="width:<%= f.rate %>%;height:100%;background:var(--accent3);border-radius:3px"></div>
+            </div>
+            <span class="badge <%= f.rate >= 80 ? 'badge-green' : f.rate >= 50 ? 'badge-yellow' : 'badge-red' %>"><%= f.rate %>%</span>
+          </div>
+        </td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>
+
+<script>
+const chartData = <%- JSON.stringify(dmChart) %>;
+const days = <%= days %>;
+const canvas = document.getElementById('analyticsChart');
+if (canvas && window.Chart) {
+  const labels = [], values = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    labels.push(days <= 7 ? d.toLocaleDateString('en-IN',{weekday:'short'}) : d.toLocaleDateString('en-IN',{day:'numeric',month:'short'}));
+    const found = chartData.find(r => r.day && r.day.startsWith(key));
+    values.push(found ? parseInt(found.count) : 0);
+  }
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'DMs Sent',
+        data: values,
+        borderColor: '#7c5cfc',
+        backgroundColor: 'rgba(124,92,252,0.1)',
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#7c5cfc',
+        pointRadius: days <= 7 ? 4 : 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9090a8' } },
+        x: { grid: { display: false }, ticks: { color: '#9090a8', maxTicksLimit: 10 } }
+      }
+    }
+  });
+}
+</script>

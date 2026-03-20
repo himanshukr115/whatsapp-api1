@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title + ' — FlowGram' : 'FlowGram' %></title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+  <%- typeof style !== 'undefined' ? style : '' %>
+</head>
+<body class="dashboard-body">
+
+<!-- Mobile overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <a href="/dashboard" class="sidebar-logo">
+      <span class="logo-icon">⚡</span>
+      <span class="logo-text">Flow<span>Gram</span></span>
+    </a>
+    <button class="sidebar-close" onclick="closeSidebar()">✕</button>
+  </div>
+
+  <% if (user) { %>
+  <div class="sidebar-account">
+    <div class="account-avatar"><%= user.full_name.charAt(0).toUpperCase() %></div>
+    <div class="account-info">
+      <div class="account-name"><%= user.full_name %></div>
+      <div class="account-plan"><%= user.plan_name || 'Free' %> Plan</div>
+    </div>
+  </div>
+  <% } %>
+
+  <nav class="sidebar-nav">
+    <span class="nav-section-label">Main</span>
+    <a href="/dashboard" class="nav-item <%= title === 'Dashboard' ? 'active' : '' %>">
+      <span class="nav-icon">📊</span><span>Dashboard</span>
+    </a>
+    <a href="/flows" class="nav-item <%= title === 'Automations' ? 'active' : '' %>">
+      <span class="nav-icon">⚡</span><span>Automations</span>
+    </a>
+    <a href="/inbox" class="nav-item <%= title === 'DM Inbox' ? 'active' : '' %>">
+      <span class="nav-icon">💬</span><span>DM Inbox</span>
+    </a>
+
+    <span class="nav-section-label" style="margin-top:12px">Tools</span>
+    <a href="/keywords" class="nav-item <%= title === 'Keywords' ? 'active' : '' %>">
+      <span class="nav-icon">🔑</span><span>Keywords</span>
+    </a>
+    <a href="/analytics" class="nav-item <%= title === 'Analytics' ? 'active' : '' %>">
+      <span class="nav-icon">📈</span><span>Analytics</span>
+    </a>
+
+    <span class="nav-section-label" style="margin-top:12px">Account</span>
+    <a href="/settings" class="nav-item <%= title === 'Settings' ? 'active' : '' %>">
+      <span class="nav-icon">⚙️</span><span>Settings</span>
+    </a>
+    <a href="/billing" class="nav-item <%= title === 'Billing & Plans' ? 'active' : '' %>">
+      <span class="nav-icon">💳</span><span>Billing</span>
+    </a>
+    <a href="/auth/logout" class="nav-item nav-logout">
+      <span class="nav-icon">🚪</span><span>Logout</span>
+    </a>
+  </nav>
+
+  <% if (user) { %>
+  <div class="sidebar-footer">
+    <div class="usage-info">
+      <span>DMs this month</span>
+      <span id="usage-count">—</span>
+    </div>
+    <div class="usage-bar-track"><div class="usage-bar-fill" id="usageFill"></div></div>
+    <% if (user.plan_slug === 'free') { %>
+    <a href="/billing" class="upgrade-btn">⚡ Upgrade to Pro</a>
+    <% } %>
+  </div>
+  <% } %>
+</aside>
+
+<!-- MAIN CONTENT -->
+<div class="main-wrapper">
+  <header class="topbar">
+    <button class="menu-toggle" onclick="openSidebar()">☰</button>
+    <h1 class="topbar-title"><%= typeof title !== 'undefined' ? title : '' %></h1>
+    <div class="topbar-right">
+      <% if (user && !user.email_verified) { %>
+      <div class="verify-banner">
+        ⚠️ Please verify your email. <a href="/auth/resend-verify">Resend</a>
+      </div>
+      <% } %>
+      <div class="topbar-user">
+        <span class="topbar-avatar"><%= user ? user.full_name.charAt(0).toUpperCase() : '?' %></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <% if (success && success.length) { %>
+    <div class="alert alert-success">
+      <% success.forEach(m => { %><%= m %><% }) %>
+    </div>
+    <% } %>
+    <% if (error && error.length) { %>
+    <div class="alert alert-error">
+      <% error.forEach(m => { %><%= m %><% }) %>
+    </div>
+    <% } %>
+
+    <%- body %>
+  </main>
+</div>
+
+<script src="/js/app.js"></script>
+<script>
+// Load usage
+fetch('/api/usage').then(r=>r.json()).then(d=>{
+  const el = document.getElementById('usage-count');
+  const bar = document.getElementById('usageFill');
+  if(el) el.textContent = (d.dms_limit === 0 ? d.dms_used + ' sent' : d.dms_used + '/' + d.dms_limit);
+  if(bar) bar.style.width = (d.dms_limit === 0 ? 20 : Math.min(100, d.dms_used/d.dms_limit*100)) + '%';
+}).catch(()=>{});
+
+function openSidebar() {
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebarOverlay').classList.add('open');
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('open');
+}
+
+// Auto-dismiss alerts
+setTimeout(() => {
+  document.querySelectorAll('.alert').forEach(el => el.style.opacity = '0');
+}, 5000);
+</script>
+<%- typeof script !== 'undefined' ? script : '' %>
+</body>
+</html>

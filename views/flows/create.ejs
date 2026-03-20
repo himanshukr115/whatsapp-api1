@@ -1,0 +1,50 @@
+<!-- views/flows/create.ejs -->
+<div class="page-header">
+  <div>
+    <h2>Create New Flow</h2>
+    <p class="page-sub">Set up your automation trigger and first message</p>
+  </div>
+  <a href="/flows" class="btn-ghost">← Back</a>
+</div>
+
+<div class="form-card" style="max-width:680px">
+  <form action="/flows" method="POST">
+    <div class="form-group">
+      <label class="form-label">Flow Name *</label>
+      <input type="text" name="name" class="form-input" placeholder="e.g. Price Inquiry Flow" required>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Description</label>
+      <textarea name="description" class="form-input" rows="2" placeholder="What does this flow do?"></textarea>
+    </div>
+    <div class="form-row-2">
+      <div class="form-group">
+        <label class="form-label">Trigger Type *</label>
+        <select name="trigger_type" class="form-select" required>
+          <option value="">Select trigger...</option>
+          <option value="dm_received">DM Received</option>
+          <option value="comment_on_post">Comment on Post</option>
+          <option value="story_reply">Story Reply</option>
+          <option value="keyword_detected">Keyword Detected</option>
+          <option value="new_follower">New Follower</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Instagram Account</label>
+        <select name="ig_account_id" class="form-select">
+          <option value="">Select account...</option>
+          <% igAccounts.forEach(acc => { %>
+          <option value="<%= acc.id %>">@<%= acc.username %></option>
+          <% }) %>
+        </select>
+        <% if (igAccounts.length === 0) { %>
+        <span class="form-hint">⚠️ <a href="/settings">Connect an Instagram account first</a></span>
+        <% } %>
+      </div>
+    </div>
+    <div class="form-actions">
+      <a href="/flows" class="btn-ghost">Cancel</a>
+      <button type="submit" class="btn-primary">Create Flow & Open Builder →</button>
+    </div>
+  </form>
+</div>

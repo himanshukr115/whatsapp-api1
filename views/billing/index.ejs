@@ -1,0 +1,185 @@
+<!-- views/billing/index.ejs -->
+<div class="page-header">
+  <div>
+    <h2>Billing & Plans</h2>
+    <p class="page-sub">Manage your subscription and payment history</p>
+  </div>
+</div>
+
+<!-- Current Plan Banner -->
+<% if (currentSubscription) { %>
+<div class="current-plan-banner">
+  <div class="current-plan-info">
+    <span class="current-plan-badge"><%= currentSubscription.plan_name %></span>
+    <span>Your current plan · renews <strong><%= new Date(currentSubscription.current_period_end).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) %></strong></span>
+  </div>
+  <% if (currentSubscription.plan_slug !== 'free') { %>
+  <form action="/billing/cancel" method="POST" onsubmit="return confirm('Cancel subscription? You will keep access until the end of the billing period.')">
+    <button class="btn-sm-danger">Cancel Plan</button>
+  </form>
+  <% } %>
+</div>
+<% } %>
+
+<!-- Plan toggle -->
+<div class="billing-toggle-wrap">
+  <span id="toggleMonthly" class="billing-toggle-label active">Monthly</span>
+  <label class="billing-toggle-switch">
+    <input type="checkbox" id="billingCycleToggle" onchange="switchCycle()">
+    <span class="billing-toggle-track"></span>
+  </label>
+  <span id="toggleYearly" class="billing-toggle-label">Yearly <span class="save-badge">Save 17%</span></span>
+</div>
+
+<!-- Plans -->
+<div class="pricing-grid-dash">
+  <% plans.forEach(plan => { %>
+  <div class="pricing-card-dash <%= currentSubscription && currentSubscription.plan_slug === plan.slug ? 'current' : '' %> <%= plan.slug === 'pro' ? 'featured' : '' %>">
+    <% if (plan.slug === 'pro') { %><div class="featured-badge">Most Popular</div><% } %>
+    <div class="plan-name-dash"><%= plan.name %></div>
+
+    <div class="plan-price-wrap">
+      <div class="plan-price-monthly">
+        <span class="price-amount">₹<%= Math.floor(plan.price_monthly / 100).toLocaleString('en-IN') %></span>
+        <span class="price-period">/month</span>
+      </div>
+      <div class="plan-price-yearly" style="display:none">
+        <span class="price-amount">₹<%= Math.floor(plan.price_yearly / 1200).toLocaleString('en-IN') %></span>
+        <span class="price-period">/month</span>
+        <div class="price-billed-yearly">₹<%= Math.floor(plan.price_yearly / 100).toLocaleString('en-IN') %> billed yearly</div>
+      </div>
+    </div>
+
+    <ul class="plan-features-dash">
+      <% (plan.features || []).forEach(f => { %>
+      <li>✓ <%= f %></li>
+      <% }) %>
+    </ul>
+
+    <% if (currentSubscription && currentSubscription.plan_slug === plan.slug) { %>
+      <button class="btn-plan-current" disabled>Current Plan</button>
+    <% } else if (plan.price_monthly === 0) { %>
+      <button class="btn-plan-ghost-dash" disabled>Free Forever</button>
+    <% } else { %>
+      <div class="payment-btns">
+        <button class="btn-razorpay" onclick="payWithRazorpay('<%= plan.slug %>')">
+          Pay with Razorpay
+        </button>
+        <button class="btn-cashfree" onclick="payWithCashfree('<%= plan.slug %>')">
+          Pay with Cashfree
+        </button>
+      </div>
+    <% } %>
+  </div>
+  <% }) %>
+</div>
+
+<!-- Payment History -->
+<div class="card" style="margin-top:32px">
+  <div class="card-header">
+    <h3>Payment History</h3>
+  </div>
+  <% if (payments.length === 0) { %>
+  <div class="empty-state"><p>No payments yet.</p></div>
+  <% } else { %>
+  <table class="data-table">
+    <thead><tr>
+      <th>Date</th><th>Plan</th><th>Amount</th><th>Gateway</th><th>Status</th><th>ID</th>
+    </tr></thead>
+    <tbody>
+      <% payments.forEach(p => { %>
+      <tr>
+        <td><%= new Date(p.created_at).toLocaleDateString('en-IN') %></td>
+        <td><%= p.plan_name || '—' %></td>
+        <td>₹<%= Math.floor(p.amount / 100).toLocaleString('en-IN') %></td>
+        <td><span class="badge badge-blue"><%= p.gateway %></span></td>
+        <td><span class="badge <%= p.status === 'completed' ? 'badge-green' : p.status === 'pending' ? 'badge-yellow' : 'badge-red' %>"><%= p.status %></span></td>
+        <td><code style="font-size:11px"><%= (p.gateway_payment_id || p.gateway_order_id || '—').substring(0,20) %></code></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>
+
+<!-- Hidden verify form -->
+<form id="rzpVerifyForm" action="/billing/razorpay/verify" method="POST" style="display:none">
+  <input type="hidden" name="razorpay_order_id" id="rzp_order_id">
+  <input type="hidden" name="razorpay_payment_id" id="rzp_payment_id">
+  <input type="hidden" name="razorpay_signature" id="rzp_signature">
+  <input type="hidden" name="plan_slug" id="rzp_plan_slug">
+  <input type="hidden" name="billing_cycle" id="rzp_billing_cycle">
+</form>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+let currentCycle = 'monthly';
+
+function switchCycle() {
+  const yearly = document.getElementById('billingCycleToggle').checked;
+  currentCycle = yearly ? 'yearly' : 'monthly';
+  document.querySelectorAll('.plan-price-monthly').forEach(el => el.style.display = yearly ? 'none' : 'block');
+  document.querySelectorAll('.plan-price-yearly').forEach(el => el.style.display = yearly ? 'block' : 'none');
+  document.getElementById('toggleMonthly').classList.toggle('active', !yearly);
+  document.getElementById('toggleYearly').classList.toggle('active', yearly);
+}
+
+async function payWithRazorpay(planSlug) {
+  try {
+    const res = await fetch('/billing/razorpay/order', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ plan_slug: planSlug, billing_cycle: currentCycle })
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    if (data.free) { window.location.reload(); return; }
+
+    const options = {
+      key: data.key,
+      amount: data.amount,
+      currency: data.currency,
+      name: 'FlowGram',
+      description: `${data.planName} Plan`,
+      order_id: data.orderId,
+      prefill: data.prefill,
+      theme: { color: '#7c5cfc' },
+      handler: function(response) {
+        document.getElementById('rzp_order_id').value = response.razorpay_order_id;
+        document.getElementById('rzp_payment_id').value = response.razorpay_payment_id;
+        document.getElementById('rzp_signature').value = response.razorpay_signature;
+        document.getElementById('rzp_plan_slug').value = planSlug;
+        document.getElementById('rzp_billing_cycle').value = currentCycle;
+        document.getElementById('rzpVerifyForm').submit();
+      }
+    };
+    new Razorpay(options).open();
+  } catch (e) {
+    alert('Payment failed. Please try again.');
+  }
+}
+
+async function payWithCashfree(planSlug) {
+  try {
+    const res = await fetch('/billing/cashfree/order', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ plan_slug: planSlug, billing_cycle: currentCycle })
+    });
+    const data = await res.json();
+    if (data.error) { alert(data.error); return; }
+    if (data.free) { window.location.reload(); return; }
+
+    // Load Cashfree SDK dynamically
+    const script = document.createElement('script');
+    script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+    script.onload = () => {
+      const cashfree = Cashfree({ mode: '<%= process.env.CASHFREE_ENV === "PROD" ? "production" : "sandbox" %>' });
+      cashfree.checkout({ paymentSessionId: data.paymentSessionId, redirectTarget: '_self' });
+    };
+    document.head.appendChild(script);
+  } catch (e) {
+    alert('Payment failed. Please try again.');
+  }
+}
+</script>

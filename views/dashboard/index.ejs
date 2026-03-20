@@ -1,0 +1,142 @@
+<!-- views/dashboard/index.ejs -->
+<div class="page-header">
+  <div>
+    <h2>Good morning, <%= user.full_name.split(' ')[0] %> 👋</h2>
+    <p class="page-sub">Here's what's happening with your automations today.</p>
+  </div>
+  <a href="/flows/create" class="btn-primary">+ New Flow</a>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid">
+  <div class="stat-card stat-purple">
+    <div class="stat-label">DMs Sent Today</div>
+    <div class="stat-value"><%= stats.dms_today || 0 %></div>
+    <div class="stat-icon">💬</div>
+  </div>
+  <div class="stat-card stat-green">
+    <div class="stat-label">Active Flows</div>
+    <div class="stat-value"><%= stats.active_flows || 0 %></div>
+    <div class="stat-icon">⚡</div>
+  </div>
+  <div class="stat-card stat-pink">
+    <div class="stat-label">New Contacts (30d)</div>
+    <div class="stat-value"><%= stats.new_contacts_30d || 0 %></div>
+    <div class="stat-icon">👥</div>
+  </div>
+  <div class="stat-card stat-orange">
+    <div class="stat-label">Total DMs (30d)</div>
+    <div class="stat-value"><%= stats.total_dms_30d || 0 %></div>
+    <div class="stat-icon">📊</div>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <!-- Chart -->
+  <div class="card">
+    <div class="card-header">
+      <h3>DMs Sent — Last 7 Days</h3>
+    </div>
+    <div class="chart-container">
+      <canvas id="dmChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- Activity -->
+  <div class="card">
+    <div class="card-header"><h3>Recent Activity</h3></div>
+    <% if (recentActivity.length === 0) { %>
+    <div class="empty-state">
+      <p>No activity yet. <a href="/flows/create">Create your first flow →</a></p>
+    </div>
+    <% } else { %>
+    <ul class="activity-list">
+      <% recentActivity.forEach(event => { %>
+      <li class="activity-item">
+        <span class="activity-dot activity-<%= event.event_type.split('_')[0] %>"></span>
+        <span class="activity-text">
+          <% if (event.flow_name) { %><strong><%= event.flow_name %></strong> — <% } %>
+          <%= event.event_type.replace(/_/g, ' ') %>
+          <% if (event.contact_username) { %> for <strong>@<%= event.contact_username %></strong><% } %>
+        </span>
+        <span class="activity-time"><%= new Date(event.created_at).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) %></span>
+      </li>
+      <% }) %>
+    </ul>
+    <% } %>
+  </div>
+</div>
+
+<!-- Top flows -->
+<div class="card" style="margin-top:16px">
+  <div class="card-header">
+    <h3>Top Performing Flows</h3>
+    <a href="/flows" class="card-link">View all →</a>
+  </div>
+  <% if (topFlows.length === 0) { %>
+  <div class="empty-state">
+    <p>No flows yet. <a href="/flows/create">Create one now →</a></p>
+  </div>
+  <% } else { %>
+  <table class="data-table">
+    <thead><tr>
+      <th>Flow Name</th><th>Triggered</th><th>Completed</th><th>Rate</th>
+    </tr></thead>
+    <tbody>
+      <% topFlows.forEach(f => { %>
+      <tr>
+        <td><%= f.name %></td>
+        <td><%= f.trigger_count %></td>
+        <td><%= f.success_count %></td>
+        <td><span class="badge badge-green"><%= f.rate %>%</span></td>
+      </tr>
+      <% }) %>
+    </tbody>
+  </table>
+  <% } %>
+</div>
+
+<!-- No IG account warning -->
+<% if (igAccounts.length === 0) { %>
+<div class="info-banner" style="margin-top:16px">
+  ⚠️ <strong>No Instagram account connected.</strong> Go to <a href="/settings">Settings</a> to connect your Instagram Business account and start automating.
+</div>
+<% } %>
+
+<script>
+const chartData = <%- JSON.stringify(chartData) %>;
+const canvas = document.getElementById('dmChart');
+if (canvas && window.Chart) {
+  const labels = [];
+  const values = [];
+  // Fill last 7 days
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const key = d.toISOString().split('T')[0];
+    labels.push(d.toLocaleDateString('en-IN', {weekday:'short'}));
+    const found = chartData.find(r => r.day && r.day.startsWith(key));
+    values.push(found ? parseInt(found.count) : 0);
+  }
+  new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'DMs Sent',
+        data: values,
+        backgroundColor: 'rgba(124,92,252,0.7)',
+        borderRadius: 6,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9090a8' } },
+        x: { grid: { display: false }, ticks: { color: '#9090a8' } }
+      }
+    }
+  });
+}
+</script>

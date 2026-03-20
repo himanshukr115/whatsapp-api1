@@ -1,0 +1,27 @@
+<!-- views/auth/login.ejs -->
+<h2 class="auth-title">Welcome back</h2>
+<p class="auth-subtitle">Sign in to your FlowGram account</p>
+
+<% if (typeof errors !== 'undefined' && errors.length) { %>
+<div class="alert alert-error"><% errors.forEach(e => { %><%= e %><% }) %></div>
+<% } %>
+<% if (success && success.length) { %>
+<div class="alert alert-success"><% success.forEach(m => { %><%= m %><% }) %></div>
+<% } %>
+
+<form action="/auth/login" method="POST" class="auth-form">
+  <div class="form-group">
+    <label class="form-label">Email address</label>
+    <input type="email" name="email" class="form-input" value="<%= typeof formData !== 'undefined' ? formData.email || '' : '' %>" placeholder="you@example.com" required autofocus>
+  </div>
+  <div class="form-group">
+    <label class="form-label">
+      Password
+      <a href="/auth/forgot-password" class="form-label-link">Forgot password?</a>
+    </label>
+    <input type="password" name="password" class="form-input" placeholder="••••••••" required>
+  </div>
+  <button type="submit" class="btn-auth">Sign In</button>
+</form>
+
+<p class="auth-switch">Don't have an account? <a href="/auth/register">Create one free</a></p>

@@ -1,0 +1,72 @@
+<!-- views/flows/index.ejs -->
+<div class="page-header">
+  <div>
+    <h2>Automations</h2>
+    <p class="page-sub">Build and manage your Instagram automation flows</p>
+  </div>
+  <a href="/flows/create" class="btn-primary">+ New Flow</a>
+</div>
+
+<div class="filter-tabs">
+  <a href="/flows?status=all" class="tab-btn <%= status==='all'?'active':'' %>">All</a>
+  <a href="/flows?status=active" class="tab-btn <%= status==='active'?'active':'' %>">Active</a>
+  <a href="/flows?status=paused" class="tab-btn <%= status==='paused'?'active':'' %>">Paused</a>
+  <a href="/flows?status=draft" class="tab-btn <%= status==='draft'?'active':'' %>">Draft</a>
+</div>
+
+<% if (flows.length === 0) { %>
+<div class="empty-card">
+  <div class="empty-icon">⚡</div>
+  <h3>No flows yet</h3>
+  <p>Create your first automation flow to start engaging with your audience automatically.</p>
+  <a href="/flows/create" class="btn-primary">Create Your First Flow</a>
+</div>
+<% } else { %>
+<div class="flows-grid">
+  <% flows.forEach(flow => { %>
+  <div class="flow-card">
+    <div class="flow-card-top">
+      <span class="trigger-badge trigger-<%= flow.trigger_type.split('_')[0] %>"><%= flow.trigger_type.replace(/_/g,' ') %></span>
+      <span class="flow-status-dot <%= flow.is_active ? 'status-on' : 'status-off' %>">
+        <%= flow.is_active ? 'Active' : (flow.is_draft ? 'Draft' : 'Paused') %>
+      </span>
+    </div>
+    <h3 class="flow-name"><%= flow.name %></h3>
+    <p class="flow-desc"><%= flow.description || 'No description' %></p>
+    <div class="flow-stats-row">
+      <span><strong><%= flow.trigger_count %></strong> triggered</span>
+      <span><strong><%= flow.success_count %></strong> completed</span>
+      <span><strong><%= flow.trigger_count > 0 ? Math.round(flow.success_count/flow.trigger_count*100) : 0 %>%</strong> rate</span>
+    </div>
+    <div class="flow-actions-row">
+      <label class="toggle" title="Toggle active">
+        <input type="checkbox" class="toggle-input" data-id="<%= flow.id %>" <%= flow.is_active ? 'checked' : '' %> onchange="toggleFlow(this)">
+        <span class="toggle-track"></span>
+      </label>
+      <a href="/flows/<%= flow.id %>/edit" class="btn-sm-ghost">Edit</a>
+      <form action="/flows/<%= flow.id %>?_method=DELETE" method="POST" style="margin-left:auto" onsubmit="return confirm('Delete this flow?')">
+        <button class="btn-sm-danger">Delete</button>
+      </form>
+    </div>
+  </div>
+  <% }) %>
+
+  <!-- Create new placeholder -->
+  <a href="/flows/create" class="flow-card flow-card-new">
+    <div class="new-flow-icon">+</div>
+    <h3>Create New Flow</h3>
+    <p>Build a new automation from scratch</p>
+  </a>
+</div>
+<% } %>
+
+<script>
+async function toggleFlow(checkbox) {
+  const id = checkbox.dataset.id;
+  try {
+    const res = await fetch(`/flows/${id}/toggle`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const data = await res.json();
+    if (data.error) { checkbox.checked = !checkbox.checked; alert(data.error); }
+  } catch (e) { checkbox.checked = !checkbox.checked; }
+}
+</script>

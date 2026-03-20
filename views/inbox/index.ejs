@@ -1,0 +1,143 @@
+<!-- views/inbox/index.ejs -->
+<div class="inbox-layout">
+  <!-- Contacts List -->
+  <div class="inbox-sidebar">
+    <div class="inbox-search-wrap">
+      <input type="text" placeholder="🔍 Search contacts..." class="form-input" id="contactSearch" oninput="filterContacts(this.value)">
+    </div>
+    <div class="contact-list" id="contactList">
+      <% if (contacts.length === 0) { %>
+      <div class="empty-state" style="padding:24px">
+        <p style="font-size:13px">No conversations yet. Connect your Instagram account and start automating to see contacts here.</p>
+      </div>
+      <% } %>
+      <% contacts.forEach(contact => { %>
+      <a href="/inbox/<%= contact.id %>" class="contact-item <%= activeContact && activeContact.id === contact.id ? 'active' : '' %>" data-name="<%= contact.display_name || contact.username || '' %>">
+        <div class="contact-avatar" style="background: hsl(<%= (contact.id.charCodeAt(0) * 137) % 360 %>, 60%, 55%)">
+          <%= (contact.display_name || contact.username || '?').charAt(0).toUpperCase() %>
+        </div>
+        <div class="contact-info">
+          <div class="contact-name"><%= contact.display_name || ('@' + contact.username) || 'Unknown' %></div>
+          <div class="contact-preview"><%= contact.last_message ? contact.last_message.substring(0, 45) + (contact.last_message.length > 45 ? '…' : '') : 'No messages' %></div>
+        </div>
+        <% if (contact.last_message_at) { %>
+        <div class="contact-time"><%= new Date(contact.last_message_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) %></div>
+        <% } %>
+      </a>
+      <% }) %>
+    </div>
+  </div>
+
+  <!-- Chat Area -->
+  <div class="chat-area">
+    <% if (!activeContact) { %>
+    <div class="chat-empty">
+      <div class="chat-empty-icon">💬</div>
+      <h3>Select a conversation</h3>
+      <p>Choose a contact from the list to view messages</p>
+    </div>
+    <% } else { %>
+    <!-- Chat Header -->
+    <div class="chat-header">
+      <div class="contact-avatar" style="background: hsl(<%= (activeContact.id.charCodeAt(0) * 137) % 360 %>, 60%, 55%)">
+        <%= (activeContact.display_name || activeContact.username || '?').charAt(0).toUpperCase() %>
+      </div>
+      <div class="chat-header-info">
+        <div class="chat-header-name"><%= activeContact.display_name || ('@' + activeContact.username) || 'Unknown' %></div>
+        <div class="chat-header-sub">@<%= activeContact.username || activeContact.ig_user_id %></div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn-sm-ghost" onclick="triggerFlow()">⚡ Trigger Flow</button>
+      </div>
+    </div>
+
+    <!-- Quick Replies -->
+    <div class="quick-replies-bar">
+      <span class="qr-label">Quick:</span>
+      <button class="quick-reply-btn" onclick="setInput(this.textContent)">Hi! Thanks for reaching out 👋</button>
+      <button class="quick-reply-btn" onclick="setInput(this.textContent)">Let me check and get back to you!</button>
+      <button class="quick-reply-btn" onclick="setInput(this.textContent)">Please check our website for details</button>
+    </div>
+
+    <!-- Messages -->
+    <div class="messages-area" id="messagesArea">
+      <% if (messages.length === 0) { %>
+      <div class="empty-state" style="padding:40px;text-align:center"><p>No messages yet.</p></div>
+      <% } %>
+      <% messages.forEach(msg => { %>
+      <div class="message-wrap message-<%= msg.direction %>">
+        <div class="message-bubble">
+          <%= msg.content %>
+          <% if (msg.is_automated) { %>
+          <div class="auto-label">⚡ Automated</div>
+          <% } %>
+        </div>
+        <div class="message-time"><%= new Date(msg.sent_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}) %></div>
+      </div>
+      <% }) %>
+    </div>
+
+    <!-- Input -->
+    <div class="chat-input-wrap">
+      <textarea id="msgInput" class="chat-textarea" placeholder="Type a message... (Ctrl+Enter to send)" rows="2" onkeydown="handleKey(event)"></textarea>
+      <button class="btn-primary" onclick="sendMessage()">Send</button>
+    </div>
+    <% } %>
+  </div>
+</div>
+
+<% if (activeContact) { %>
+<script>
+const contactId = '<%= activeContact.id %>';
+
+// Scroll to bottom
+const area = document.getElementById('messagesArea');
+if (area) area.scrollTop = area.scrollHeight;
+
+function setInput(text) {
+  document.getElementById('msgInput').value = text;
+  document.getElementById('msgInput').focus();
+}
+
+function handleKey(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); sendMessage(); }
+}
+
+async function sendMessage() {
+  const input = document.getElementById('msgInput');
+  const content = input.value.trim();
+  if (!content) return;
+
+  try {
+    const res = await fetch(`/inbox/${contactId}/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    const data = await res.json();
+    if (data.success) {
+      const bubble = document.createElement('div');
+      bubble.className = 'message-wrap message-out';
+      bubble.innerHTML = `<div class="message-bubble">${content}</div><div class="message-time">Now</div>`;
+      area.appendChild(bubble);
+      area.scrollTop = area.scrollHeight;
+      input.value = '';
+    }
+  } catch(e) { alert('Failed to send message'); }
+}
+
+function triggerFlow() {
+  alert('Flow trigger via dashboard coming soon. Use automation flows for automated triggering.');
+}
+</script>
+<% } %>
+
+<script>
+function filterContacts(q) {
+  const items = document.querySelectorAll('.contact-item');
+  items.forEach(item => {
+    const name = item.dataset.name.toLowerCase();
+    item.style.display = name.includes(q.toLowerCase()) ? '' : 'none';
+  });
+}
+</script>

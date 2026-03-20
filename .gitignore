@@ -1,0 +1,10 @@
+# .gitignore
+node_modules/
+.env
+logs/
+uploads/
+*.log
+.DS_Store
+dist/
+.nyc_output/
+coverage/

@@ -1,0 +1,181 @@
+<!-- views/flows/edit.ejs -->
+<div class="page-header">
+  <div>
+    <h2>Edit Flow: <%= flow.name %></h2>
+    <p class="page-sub">Trigger: <strong><%= flow.trigger_type.replace(/_/g,' ') %></strong></p>
+  </div>
+  <div style="display:flex;gap:8px">
+    <a href="/flows" class="btn-ghost">← Back</a>
+    <button onclick="saveFlow()" class="btn-primary">Save Flow</button>
+  </div>
+</div>
+
+<div class="builder-layout">
+  <!-- Left: Settings -->
+  <div class="builder-sidebar">
+    <div class="card">
+      <h4 class="builder-section-title">Flow Settings</h4>
+      <div class="form-group">
+        <label class="form-label">Flow Name</label>
+        <input type="text" id="flowName" class="form-input" value="<%= flow.name %>">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea id="flowDesc" class="form-input" rows="2"><%= flow.description || '' %></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select id="flowActive" class="form-select">
+          <option value="true" <%= flow.is_active ? 'selected' : '' %>>Active</option>
+          <option value="false" <%= !flow.is_active ? 'selected' : '' %>>Paused</option>
+        </select>
+      </div>
+
+      <h4 class="builder-section-title" style="margin-top:20px">Add Step</h4>
+      <div class="node-palette">
+        <button class="palette-btn" onclick="addNode('send_message')">💬 Send Message</button>
+        <button class="palette-btn" onclick="addNode('wait')">⏱ Wait / Delay</button>
+        <button class="palette-btn" onclick="addNode('condition')">🔀 Condition</button>
+        <button class="palette-btn" onclick="addNode('send_link')">🔗 Send Link</button>
+        <button class="palette-btn" onclick="addNode('tag_contact')">🏷️ Tag Contact</button>
+        <button class="palette-btn" onclick="addNode('end_flow')">🏁 End Flow</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Canvas -->
+  <div class="builder-canvas-wrap">
+    <div class="builder-canvas" id="builderCanvas">
+      <!-- Trigger node (always first) -->
+      <div class="builder-node builder-node-trigger">
+        <div class="node-type-label">Trigger</div>
+        <div class="node-title">📩 <%= flow.trigger_type.replace(/_/g,' ') %></div>
+      </div>
+      <div class="node-connector-line"></div>
+      <div id="nodesList"></div>
+      <button class="add-node-ghost" onclick="addNode('send_message')">+ Add Step</button>
+    </div>
+  </div>
+
+  <!-- Right panel: Node editor -->
+  <div class="node-editor-panel" id="nodeEditor" style="display:none">
+    <div class="node-editor-header">
+      <h4 id="nodeEditorTitle">Edit Step</h4>
+      <button onclick="closeNodeEditor()" class="btn-icon">✕</button>
+    </div>
+    <div id="nodeEditorBody"></div>
+  </div>
+</div>
+
+<form id="saveForm" action="/flows/<%= flow.id %>?_method=PUT" method="POST" style="display:none">
+  <input type="hidden" name="name" id="fName">
+  <input type="hidden" name="description" id="fDesc">
+  <input type="hidden" name="is_active" id="fActive">
+  <input type="hidden" name="nodes" id="fNodes">
+  <input type="hidden" name="trigger_config" value="<%= JSON.stringify(flow.trigger_config).replace(/"/g,'&quot;') %>">
+</form>
+
+<script>
+let nodes = <%- JSON.stringify(flow.nodes || []) %>;
+
+const nodeTemplates = {
+  send_message: { type:'send_message', label:'💬 Send Message', content:'Hi {{first_name}}! Thanks for reaching out.' },
+  wait: { type:'wait', label:'⏱ Wait', duration:60, unit:'minutes' },
+  condition: { type:'condition', label:'🔀 Condition', field:'message', operator:'contains', value:'' },
+  send_link: { type:'send_link', label:'🔗 Send Link', url:'', text:'Click here' },
+  tag_contact: { type:'tag_contact', label:'🏷️ Tag Contact', tag:'' },
+  end_flow: { type:'end_flow', label:'🏁 End Flow' },
+};
+
+function renderNodes() {
+  const list = document.getElementById('nodesList');
+  list.innerHTML = '';
+  nodes.forEach((node, i) => {
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <div class="builder-node builder-node-action" onclick="editNode(${i})">
+        <div class="node-type-label">Step ${i+1}</div>
+        <div class="node-title">${node.label || node.type}</div>
+        <button class="node-delete" onclick="event.stopPropagation();deleteNode(${i})">✕</button>
+      </div>
+      <div class="node-connector-line"></div>`;
+    list.appendChild(div);
+  });
+}
+
+function addNode(type) {
+  const node = {...nodeTemplates[type]};
+  nodes.push(node);
+  renderNodes();
+}
+
+function deleteNode(i) {
+  nodes.splice(i, 1);
+  renderNodes();
+  closeNodeEditor();
+}
+
+let editingIndex = -1;
+function editNode(i) {
+  editingIndex = i;
+  const node = nodes[i];
+  const panel = document.getElementById('nodeEditor');
+  const title = document.getElementById('nodeEditorTitle');
+  const body = document.getElementById('nodeEditorBody');
+  title.textContent = `Edit: ${node.label}`;
+  panel.style.display = 'block';
+
+  let html = '';
+  if (node.type === 'send_message') {
+    html = `<div class="form-group"><label class="form-label">Message Content</label>
+      <textarea class="form-input" rows="5" id="ne_content" placeholder="Use {{first_name}} for personalisation">${node.content||''}</textarea>
+      <span class="form-hint">Variables: {{first_name}}, {{username}}, {{ig_handle}}</span></div>`;
+  } else if (node.type === 'wait') {
+    html = `<div class="form-row-2">
+      <div class="form-group"><label class="form-label">Duration</label><input type="number" class="form-input" id="ne_duration" value="${node.duration||60}" min="1"></div>
+      <div class="form-group"><label class="form-label">Unit</label><select class="form-select" id="ne_unit">
+        <option ${node.unit==='minutes'?'selected':''}>minutes</option>
+        <option ${node.unit==='hours'?'selected':''}>hours</option>
+        <option ${node.unit==='days'?'selected':''}>days</option>
+      </select></div></div>`;
+  } else if (node.type === 'condition') {
+    html = `<div class="form-group"><label class="form-label">If message</label>
+      <select class="form-select" id="ne_operator"><option ${node.operator==='contains'?'selected':''}>contains</option><option ${node.operator==='equals'?'selected':''}>equals</option></select></div>
+      <div class="form-group"><label class="form-label">Value</label><input type="text" class="form-input" id="ne_value" value="${node.value||''}"></div>`;
+  } else if (node.type === 'send_link') {
+    html = `<div class="form-group"><label class="form-label">Link URL</label><input type="url" class="form-input" id="ne_url" value="${node.url||''}"></div>
+      <div class="form-group"><label class="form-label">Button Text</label><input type="text" class="form-input" id="ne_text" value="${node.text||'Click here'}"></div>`;
+  } else if (node.type === 'tag_contact') {
+    html = `<div class="form-group"><label class="form-label">Tag Name</label><input type="text" class="form-input" id="ne_tag" value="${node.tag||''}" placeholder="e.g. interested, customer"></div>`;
+  } else {
+    html = `<p style="color:var(--text2);font-size:13px">No configuration needed for this step.</p>`;
+  }
+  html += `<button class="btn-primary" style="width:100%;margin-top:16px" onclick="saveNodeEdit()">Save Step</button>`;
+  body.innerHTML = html;
+}
+
+function saveNodeEdit() {
+  const node = nodes[editingIndex];
+  if (node.type === 'send_message') node.content = document.getElementById('ne_content')?.value || '';
+  if (node.type === 'wait') { node.duration = parseInt(document.getElementById('ne_duration')?.value); node.unit = document.getElementById('ne_unit')?.value; }
+  if (node.type === 'condition') { node.operator = document.getElementById('ne_operator')?.value; node.value = document.getElementById('ne_value')?.value; }
+  if (node.type === 'send_link') { node.url = document.getElementById('ne_url')?.value; node.text = document.getElementById('ne_text')?.value; }
+  if (node.type === 'tag_contact') node.tag = document.getElementById('ne_tag')?.value;
+  closeNodeEditor();
+  renderNodes();
+}
+
+function closeNodeEditor() {
+  document.getElementById('nodeEditor').style.display = 'none';
+}
+
+function saveFlow() {
+  document.getElementById('fName').value = document.getElementById('flowName').value;
+  document.getElementById('fDesc').value = document.getElementById('flowDesc').value;
+  document.getElementById('fActive').value = document.getElementById('flowActive').value;
+  document.getElementById('fNodes').value = JSON.stringify(nodes);
+  document.getElementById('saveForm').submit();
+}
+
+renderNodes();
+</script>

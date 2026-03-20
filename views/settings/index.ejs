@@ -1,0 +1,154 @@
+<!-- views/settings/index.ejs -->
+<div class="page-header">
+  <div>
+    <h2>Settings</h2>
+    <p class="page-sub">Manage your account and preferences</p>
+  </div>
+</div>
+
+<div class="settings-layout">
+  <!-- Tabs -->
+  <div class="settings-tabs" id="settingsTabs">
+    <button class="settings-tab active" onclick="showTab('profile',this)">Profile</button>
+    <button class="settings-tab" onclick="showTab('password',this)">Password</button>
+    <button class="settings-tab" onclick="showTab('instagram',this)">Instagram</button>
+    <button class="settings-tab" onclick="showTab('danger',this)">Danger Zone</button>
+  </div>
+
+  <!-- Profile -->
+  <div class="settings-panel active" id="tab-profile">
+    <div class="card">
+      <h3 class="settings-section-title">Profile Information</h3>
+      <form action="/settings/profile" method="POST">
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Full Name</label>
+            <input type="text" name="full_name" class="form-input" value="<%= profile.full_name %>" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-input" value="<%= profile.email %>" disabled>
+            <span class="form-hint">Email cannot be changed.</span>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Business Name</label>
+            <input type="text" name="business_name" class="form-input" value="<%= profile.business_name || '' %>">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Timezone</label>
+            <select name="timezone" class="form-select">
+              <option value="Asia/Kolkata" <%= profile.timezone === 'Asia/Kolkata' ? 'selected' : '' %>>Asia/Kolkata (IST)</option>
+              <option value="UTC" <%= profile.timezone === 'UTC' ? 'selected' : '' %>>UTC</option>
+              <option value="America/New_York" <%= profile.timezone === 'America/New_York' ? 'selected' : '' %>>US/Eastern</option>
+              <option value="Europe/London" <%= profile.timezone === 'Europe/London' ? 'selected' : '' %>>Europe/London</option>
+            </select>
+          </div>
+        </div>
+        <button type="submit" class="btn-primary">Save Profile</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Password -->
+  <div class="settings-panel" id="tab-password">
+    <div class="card">
+      <h3 class="settings-section-title">Change Password</h3>
+      <form action="/settings/password" method="POST" style="max-width:440px">
+        <div class="form-group">
+          <label class="form-label">Current Password</label>
+          <input type="password" name="current_password" class="form-input" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">New Password</label>
+          <input type="password" name="new_password" class="form-input" placeholder="Min 8 characters" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm New Password</label>
+          <input type="password" name="confirm_password" class="form-input" required>
+        </div>
+        <button type="submit" class="btn-primary">Update Password</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Instagram -->
+  <div class="settings-panel" id="tab-instagram">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="settings-section-title">Connected Instagram Accounts</h3>
+      </div>
+      <% if (igAccounts.length === 0) { %>
+      <div class="empty-state">
+        <p>No Instagram accounts connected yet.</p>
+        <p style="margin-top:8px;font-size:13px;color:var(--text2)">To connect an account, you need a <strong>Meta Business Account</strong> with Instagram API access approved by Meta. Once approved, paste your access token below.</p>
+      </div>
+      <% } else { %>
+      <% igAccounts.forEach(acc => { %>
+      <div class="ig-account-row">
+        <div class="ig-avatar-sm"><%= acc.username.charAt(0).toUpperCase() %></div>
+        <div class="ig-account-info">
+          <strong>@<%= acc.username %></strong>
+          <span class="ig-followers"><%= (acc.followers_count || 0).toLocaleString('en-IN') %> followers</span>
+        </div>
+        <span class="badge <%= acc.is_active ? 'badge-green' : 'badge-red' %>">
+          <%= acc.is_active ? 'Connected' : 'Disconnected' %>
+        </span>
+        <form action="/settings/ig/<%= acc.id %>/disconnect" method="POST" onsubmit="return confirm('Disconnect this account?')">
+          <button class="btn-sm-danger">Disconnect</button>
+        </form>
+      </div>
+      <% }) %>
+      <% } %>
+
+      <div class="info-banner" style="margin-top:20px">
+        <strong>📋 How to connect Instagram:</strong>
+        <ol style="margin-top:8px;padding-left:20px;line-height:2;font-size:13px">
+          <li>Create a <a href="https://developers.facebook.com" target="_blank">Meta Developer App</a></li>
+          <li>Add the Instagram Graph API product</li>
+          <li>Get Advanced Access approved by Meta</li>
+          <li>Generate a long-lived Page Access Token</li>
+          <li>Use <code>/api/ig/connect</code> endpoint with your token</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- Danger Zone -->
+  <div class="settings-panel" id="tab-danger">
+    <div class="card danger-card">
+      <h3 class="settings-section-title" style="color:var(--red)">⚠️ Danger Zone</h3>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:20px">These actions are irreversible. Please be certain before proceeding.</p>
+      <div class="danger-action">
+        <div>
+          <strong>Delete Account</strong>
+          <p style="font-size:12px;color:var(--text2);margin-top:2px">Permanently delete your account and all data.</p>
+        </div>
+        <button class="btn-danger" onclick="document.getElementById('deleteModal').style.display='flex'">Delete Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div id="deleteModal" class="modal-backdrop" style="display:none" onclick="if(event.target===this)this.style.display='none'">
+  <div class="modal">
+    <h3>Delete Account</h3>
+    <p style="color:var(--text2);margin:12px 0 20px;font-size:13px">This will permanently delete your account, all flows, contacts, and data. Type <strong>DELETE</strong> to confirm.</p>
+    <form action="/settings/delete-account" method="POST">
+      <input type="text" name="confirm_text" class="form-input" placeholder="Type DELETE to confirm" style="margin-bottom:16px" required>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" class="btn-ghost" onclick="document.getElementById('deleteModal').style.display='none'">Cancel</button>
+        <button type="submit" class="btn-danger">Permanently Delete</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function showTab(name, btn) {
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
