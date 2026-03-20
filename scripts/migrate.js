@@ -226,6 +226,12 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE TRIGGER update_payments_updated_at BEFORE UPDATE ON payments FOR EACH ROW EXECUTE PROCEDURE update_updated_at();
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ─── Backward-compatible alter statements ──────────────────────────────────
+ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);
+ALTER TABLE users ALTER COLUMN is_active SET DEFAULT TRUE;
+UPDATE users SET is_active = TRUE WHERE is_active IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
 `;
 
 async function migrate() {

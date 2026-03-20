@@ -1,0 +1,44 @@
+<section class="dashboard-grid" style="grid-template-columns: repeat(5, minmax(140px,1fr));">
+  <div class="card stat"><h3>Total Users</h3><p><%= stats.total_users %></p></div>
+  <div class="card stat"><h3>New (30d)</h3><p><%= stats.users_last_30_days %></p></div>
+  <div class="card stat"><h3>Active Subs</h3><p><%= stats.active_subscriptions %></p></div>
+  <div class="card stat"><h3>Paid Users</h3><p><%= stats.paid_users %></p></div>
+  <div class="card stat"><h3>Revenue</h3><p>₹<%= Number(stats.revenue_captured || 0).toLocaleString() %></p></div>
+</section>
+
+<section class="card" style="margin-top:18px; overflow:auto;">
+  <h3 style="margin-bottom:10px;">Latest Registrations</h3>
+  <table class="table">
+    <thead><tr><th>Name</th><th>Email</th><th>Business</th><th>Registered</th><th>Last Login</th></tr></thead>
+    <tbody>
+      <% recentUsers.forEach((user) => { %>
+        <tr>
+          <td><%= user.full_name %></td>
+          <td><%= user.email %></td>
+          <td><%= user.business_name || '—' %></td>
+          <td><%= new Date(user.created_at).toLocaleString() %></td>
+          <td><%= user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never' %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>
+
+<section class="card" style="margin-top:18px; overflow:auto;">
+  <h3 style="margin-bottom:10px;">Recent Plan Payments</h3>
+  <table class="table">
+    <thead><tr><th>User</th><th>Email</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+    <tbody>
+      <% paidUsers.forEach((payment) => { %>
+        <tr>
+          <td><%= payment.full_name %></td>
+          <td><%= payment.email %></td>
+          <td><%= payment.plan_name || 'N/A' %></td>
+          <td><%= payment.currency %> <%= Number(payment.amount || 0).toLocaleString() %></td>
+          <td><%= payment.status %></td>
+          <td><%= new Date(payment.created_at).toLocaleString() %></td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</section>

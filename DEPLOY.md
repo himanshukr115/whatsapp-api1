@@ -225,6 +225,10 @@ When you outgrow a single droplet:
 | CASHFREE_SECRET_KEY | From Cashfree dashboard | 💳 |
 | SMTP_HOST | Your SMTP server | 📧 |
 | META_APP_ID | From Meta Developers | 📱 |
+| GOOGLE_CLIENT_ID | Google OAuth client ID | 🔐 |
+| GOOGLE_CLIENT_SECRET | Google OAuth secret | 🔐 |
+| GOOGLE_REDIRECT_URI | Google callback URL (`https://yourdomain.com/auth/google/callback`) | 🔐 |
+| ADMIN_EMAILS | Comma-separated admin emails for `/admin` panel | 🛡️ |
 
 ---
 

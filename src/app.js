@@ -98,6 +98,7 @@ app.use('/keywords', require('./routes/keywords'));
 app.use('/analytics', require('./routes/analytics'));
 app.use('/billing', require('./routes/billing'));
 app.use('/settings', require('./routes/settings'));
+app.use('/admin', require('./routes/admin'));
 app.use('/api/webhooks', require('./routes/webhooks'));
 app.use('/api', require('./routes/api'));
 

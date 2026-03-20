@@ -5,6 +5,14 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../../config/database');
 const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
+const axios = require('axios');
+
+const getAdminEmails = () => (process.env.ADMIN_EMAILS || 'admin@flowgram.in')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+const isAdminEmail = (email) => getAdminEmails().includes((email || '').toLowerCase());
 
 // ── Register ──────────────────────────────────────────────────────────────
 exports.showRegister = (req, res) => {
@@ -110,7 +118,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    if (!user.is_active) {
+    if (user.is_active === false) {
       return res.render('auth/login', {
         layout: 'layouts/auth', title: 'Login',
         errors: ['Your account has been deactivated. Contact support.'], formData: { email }
@@ -131,6 +139,7 @@ exports.login = async (req, res) => {
       flow_limit: user.flow_limit || 3,
       ig_accounts_limit: user.ig_accounts_limit || 1,
       email_verified: user.email_verified,
+      is_admin: isAdminEmail(user.email),
     };
 
     logger.info('User logged in', { userId: user.id, email });
@@ -160,6 +169,143 @@ exports.logout = (req, res) => {
     res.clearCookie('fg.sid');
     res.redirect('/');
   });
+};
+
+exports.googleLogin = (req, res) => {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_REDIRECT_URI) {
+    req.flash('error', 'Google login is not configured yet.');
+    return res.redirect('/auth/login');
+  }
+
+  const state = crypto.randomBytes(16).toString('hex');
+  req.session.oauth_state = state;
+
+  const params = new URLSearchParams({
+    client_id: process.env.GOOGLE_CLIENT_ID,
+    redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+    response_type: 'code',
+    scope: 'openid email profile',
+    state,
+    prompt: 'select_account',
+  });
+
+  return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+};
+
+exports.googleCallback = async (req, res) => {
+  const { code, state } = req.query;
+
+  if (!code || !state || state !== req.session.oauth_state) {
+    req.flash('error', 'Invalid Google login request. Please try again.');
+    return res.redirect('/auth/login');
+  }
+
+  delete req.session.oauth_state;
+
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
+    req.flash('error', 'Google login is not configured yet.');
+    return res.redirect('/auth/login');
+  }
+
+  try {
+    const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', new URLSearchParams({
+      code,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET,
+      redirect_uri: process.env.GOOGLE_REDIRECT_URI,
+      grant_type: 'authorization_code',
+    }), {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    });
+
+    const { access_token } = tokenResponse.data;
+
+    const profileResponse = await axios.get('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${access_token}` },
+    });
+
+    const { sub: googleId, email, name, picture, email_verified: emailVerified } = profileResponse.data;
+    if (!email || !googleId) {
+      req.flash('error', 'Google login failed: no email returned.');
+      return res.redirect('/auth/login');
+    }
+
+    const normalizedEmail = email.toLowerCase();
+    const { rows: existingRows } = await db.query(`
+      SELECT u.*, p.slug as plan_slug, p.name as plan_name, p.dm_limit, p.flow_limit, p.ig_accounts as ig_accounts_limit
+      FROM users u
+      LEFT JOIN subscriptions s ON s.user_id = u.id AND s.status = 'active'
+      LEFT JOIN plans p ON p.id = s.plan_id
+      WHERE u.email = $1
+      ORDER BY s.created_at DESC LIMIT 1
+    `, [normalizedEmail]);
+
+    let user = existingRows[0];
+
+    if (!user) {
+      const randomPassword = crypto.randomBytes(32).toString('hex');
+      const passwordHash = await bcrypt.hash(randomPassword, 12);
+
+      const { rows } = await db.query(`
+        INSERT INTO users (email, password_hash, full_name, avatar_url, email_verified, google_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+      `, [normalizedEmail, passwordHash, name || normalizedEmail.split('@')[0], picture || null, !!emailVerified, googleId]);
+      user = rows[0];
+
+      const plan = await db.query("SELECT id FROM plans WHERE slug = 'free' LIMIT 1");
+      if (plan.rows.length) {
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + 1);
+        await db.query(`
+          INSERT INTO subscriptions (user_id, plan_id, billing_cycle, current_period_end, payment_gateway)
+          VALUES ($1, $2, 'monthly', $3, 'free')
+        `, [user.id, plan.rows[0].id, endDate]);
+      }
+    } else {
+      await db.query(`
+        UPDATE users
+        SET google_id = COALESCE(google_id, $1),
+            avatar_url = COALESCE(avatar_url, $2),
+            email_verified = CASE WHEN $3 = TRUE THEN TRUE ELSE email_verified END,
+            last_login_at = NOW()
+        WHERE id = $4
+      `, [googleId, picture || null, !!emailVerified, user.id]);
+    }
+
+    const { rows: sessionRows } = await db.query(`
+      SELECT u.*, p.slug as plan_slug, p.name as plan_name, p.dm_limit, p.flow_limit, p.ig_accounts as ig_accounts_limit
+      FROM users u
+      LEFT JOIN subscriptions s ON s.user_id = u.id AND s.status = 'active'
+      LEFT JOIN plans p ON p.id = s.plan_id
+      WHERE u.id = $1
+      ORDER BY s.created_at DESC LIMIT 1
+    `, [user.id]);
+
+    const userForSession = sessionRows[0];
+
+    req.session.user = {
+      id: userForSession.id,
+      email: userForSession.email,
+      full_name: userForSession.full_name,
+      business_name: userForSession.business_name,
+      avatar_url: userForSession.avatar_url,
+      plan_slug: userForSession.plan_slug || 'free',
+      plan_name: userForSession.plan_name || 'Free',
+      dm_limit: userForSession.dm_limit || 1000,
+      flow_limit: userForSession.flow_limit || 3,
+      ig_accounts_limit: userForSession.ig_accounts_limit || 1,
+      email_verified: userForSession.email_verified,
+      is_admin: isAdminEmail(userForSession.email),
+    };
+
+    req.flash('success', 'Logged in with Google successfully.');
+    return res.redirect('/dashboard');
+  } catch (err) {
+    logger.error('Google login error', { error: err.message, data: err.response?.data });
+    req.flash('error', 'Google login failed. Please try again.');
+    return res.redirect('/auth/login');
+  }
 };
 
 // ── Verify Email ──────────────────────────────────────────────────────────

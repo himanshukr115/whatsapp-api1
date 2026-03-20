@@ -7,6 +7,8 @@ router.get('/login', requireGuest, auth.showLogin);
 router.post('/login', requireGuest, auth.login);
 router.get('/register', requireGuest, auth.showRegister);
 router.post('/register', requireGuest, auth.register);
+router.get('/google', requireGuest, auth.googleLogin);
+router.get('/google/callback', requireGuest, auth.googleCallback);
 router.get('/logout', auth.logout);
 router.get('/verify/:token', auth.verifyEmail);
 router.get('/forgot-password', requireGuest, auth.showForgotPassword);

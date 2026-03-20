@@ -61,6 +61,11 @@
     <a href="/billing" class="nav-item <%= title === 'Billing & Plans' ? 'active' : '' %>">
       <span class="nav-icon">💳</span><span>Billing</span>
     </a>
+    <% if (user && user.is_admin) { %>
+    <a href="/admin" class="nav-item <%= title === 'SaaS Admin' ? 'active' : '' %>">
+      <span class="nav-icon">🛡️</span><span>SaaS Admin</span>
+    </a>
+    <% } %>
     <a href="/auth/logout" class="nav-item nav-logout">
       <span class="nav-icon">🚪</span><span>Logout</span>
     </a>
