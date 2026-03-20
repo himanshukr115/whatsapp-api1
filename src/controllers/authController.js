@@ -134,7 +134,17 @@ exports.login = async (req, res) => {
     };
 
     logger.info('User logged in', { userId: user.id, email });
-    res.redirect('/dashboard');
+    req.session.save((err) => {
+      if (err) {
+        logger.error('Session save error', { error: err.message });
+        return res.render('auth/login', {
+          layout: 'layouts/auth', title: 'Login',
+          errors: ['Session error. Please try again.'], formData: { email }
+        });
+      }
+      req.flash('success', `Welcome back, ${user.full_name}!`);
+      res.redirect('/dashboard');
+    });
   } catch (err) {
     logger.error('Login error', { error: err.message });
     res.render('auth/login', {
