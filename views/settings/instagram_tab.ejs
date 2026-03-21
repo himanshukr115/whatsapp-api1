@@ -52,6 +52,15 @@
       <li>FlowGram uses <strong>only the official Meta Graph API</strong> — 100% compliant, no password stored</li>
     </ul>
   </div>
+
+  <div class="info-banner" style="margin-top:12px">
+    <strong>🔐 SaaS Meta Keys vs User Tokens (Important)</strong>
+    <ul style="margin-top:10px;padding-left:20px;line-height:2;font-size:13px;color:var(--text2)">
+      <li><code>META_APP_ID</code>, <code>META_APP_SECRET</code>, and <code>META_WEBHOOK_VERIFY_TOKEN</code> are <strong>global app-level keys</strong> for your SaaS backend (configured once by the platform owner).</li>
+      <li>When each customer signs up and connects Instagram, they authorize with Meta and FlowGram stores that customer’s <strong>own access token</strong> in <code>ig_accounts.access_token</code>.</li>
+      <li>So the app keys are shared for the platform, but Instagram access tokens are different for every connected user/account.</li>
+    </ul>
+  </div>
 </div>
 
 <!-- ══ CONNECT INSTAGRAM MODAL ══ -->

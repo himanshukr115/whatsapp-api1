@@ -225,10 +225,18 @@ When you outgrow a single droplet:
 | CASHFREE_SECRET_KEY | From Cashfree dashboard | 💳 |
 | SMTP_HOST | Your SMTP server | 📧 |
 | META_APP_ID | From Meta Developers | 📱 |
+| META_APP_SECRET | From Meta Developers | 📱 |
+| META_WEBHOOK_VERIFY_TOKEN | Any long random string used for Meta webhook verification | 📱 |
 | GOOGLE_CLIENT_ID | Google OAuth client ID | 🔐 |
 | GOOGLE_CLIENT_SECRET | Google OAuth secret | 🔐 |
 | GOOGLE_REDIRECT_URI | Google callback URL (`https://yourdomain.com/auth/google/callback`) | 🔐 |
 | ADMIN_EMAILS | Comma-separated admin emails for `/admin` panel | 🛡️ |
+
+### Meta credentials model (SaaS)
+
+- `META_APP_ID`, `META_APP_SECRET`, and `META_WEBHOOK_VERIFY_TOKEN` are **platform-level** values set once by the SaaS owner.
+- Each user who signs up connects their own Instagram/Facebook account and grants their own permissions.
+- Therefore every user/account gets a different `access_token` stored in `ig_accounts`, while app-level Meta keys stay the same across the platform.
 
 ---
 
