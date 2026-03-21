@@ -1,5 +1,6 @@
 // src/middleware/auth.js
 const logger = require('../utils/logger');
+const db = require('../../config/database');
 
 exports.requireAuth = (req, res, next) => {
   if (req.session && req.session.user) {
@@ -16,14 +17,30 @@ exports.requireGuest = (req, res, next) => {
   return res.redirect('/dashboard');
 };
 
-exports.requireAdmin = (req, res, next) => {
-  const adminEmails = (process.env.ADMIN_EMAILS || 'admin@flowgram.in')
-    .split(',')
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-  const email = req.session?.user?.email?.toLowerCase();
-  if (email && adminEmails.includes(email)) return next();
+exports.requireAdmin = async (req, res, next) => {
+  const sessionRole = req.session?.user?.role || 'user';
+  if (sessionRole === 'admin') return next();
+
+  try {
+    const userId = req.session?.user?.id;
+    if (!userId) throw new Error('No user id in session');
+    const { rows } = await db.query('SELECT role FROM users WHERE id = $1 LIMIT 1', [userId]);
+    const dbRole = rows[0]?.role || 'user';
+    req.session.user.role = dbRole;
+    req.session.user.is_admin = dbRole === 'admin';
+    if (dbRole === 'admin') return next();
+  } catch (error) {
+    logger.warn('Admin role check failed', { error: error.message, userId: req.session?.user?.id });
+  }
+
   req.flash('error', 'You are not authorized to access admin dashboard.');
+  return res.redirect('/dashboard');
+};
+
+exports.requireModerator = (req, res, next) => {
+  const role = req.session?.user?.role || 'user';
+  if (role === 'admin' || role === 'moderator') return next();
+  req.flash('error', 'Moderator or admin access is required.');
   return res.redirect('/dashboard');
 };
 

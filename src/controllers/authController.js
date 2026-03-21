@@ -7,12 +7,8 @@ const emailService = require('../services/emailService');
 const logger = require('../utils/logger');
 const axios = require('axios');
 
-const getAdminEmails = () => (process.env.ADMIN_EMAILS || 'admin@flowgram.in')
-  .split(',')
-  .map((email) => email.trim().toLowerCase())
-  .filter(Boolean);
-
-const isAdminEmail = (email) => getAdminEmails().includes((email || '').toLowerCase());
+const VALID_ROLES = ['user', 'admin', 'moderator'];
+const normalizeRole = (role) => (VALID_ROLES.includes(role) ? role : 'user');
 
 // ── Register ──────────────────────────────────────────────────────────────
 exports.showRegister = (req, res) => {
@@ -50,9 +46,9 @@ exports.register = async (req, res) => {
     // console.log('Generated verify token:', verify_token); // Debug log
     // console.log('User email:', email); // Debug log
     const { rows } = await db.query(`
-      INSERT INTO users (email, password_hash, full_name, business_name, email_verify_token)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, email, full_name
+      INSERT INTO users (email, password_hash, role, full_name, business_name, email_verify_token)
+      VALUES ($1, $2, 'user', $3, $4, $5)
+      RETURNING id, email, full_name, role
     `, [email.toLowerCase(), password_hash, full_name.trim(), business_name?.trim() || null, verify_token]);
 
     const user = rows[0];
@@ -134,6 +130,7 @@ exports.login = async (req, res) => {
     req.session.user = {
       id: user.id,
       email: user.email,
+      role: normalizeRole(user.role),
       full_name: user.full_name,
       business_name: user.business_name,
       avatar_url: user.avatar_url,
@@ -143,7 +140,7 @@ exports.login = async (req, res) => {
       flow_limit: user.flow_limit || 3,
       ig_accounts_limit: user.ig_accounts_limit || 1,
       email_verified: user.email_verified,
-      is_admin: isAdminEmail(user.email),
+      is_admin: normalizeRole(user.role) === 'admin',
     };
 
     logger.info('User logged in', { userId: user.id, email });
@@ -292,8 +289,8 @@ exports.googleCallback = async (req, res) => {
       const passwordHash = await bcrypt.hash(randomPassword, 12);
 
       const { rows } = await db.query(`
-        INSERT INTO users (email, password_hash, full_name, avatar_url, email_verified, google_id)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO users (email, password_hash, role, full_name, avatar_url, email_verified, google_id)
+        VALUES ($1, $2, 'user', $3, $4, $5, $6)
         RETURNING *
       `, [normalizedEmail, passwordHash, name || normalizedEmail.split('@')[0], picture || null, !!emailVerified, googleId]);
       user = rows[0];
@@ -332,6 +329,7 @@ exports.googleCallback = async (req, res) => {
     req.session.user = {
       id: userForSession.id,
       email: userForSession.email,
+      role: normalizeRole(userForSession.role),
       full_name: userForSession.full_name,
       business_name: userForSession.business_name,
       avatar_url: userForSession.avatar_url,
@@ -341,7 +339,7 @@ exports.googleCallback = async (req, res) => {
       flow_limit: userForSession.flow_limit || 3,
       ig_accounts_limit: userForSession.ig_accounts_limit || 1,
       email_verified: userForSession.email_verified,
-      is_admin: isAdminEmail(userForSession.email),
+      is_admin: normalizeRole(userForSession.role) === 'admin',
     };
 
     req.flash('success', 'Logged in with Google successfully.');

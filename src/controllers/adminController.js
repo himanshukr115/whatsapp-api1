@@ -9,11 +9,11 @@ exports.index = async (req, res) => {
           (SELECT COUNT(*)::int FROM users) AS total_users,
           (SELECT COUNT(*)::int FROM users WHERE created_at >= NOW() - INTERVAL '30 days') AS users_last_30_days,
           (SELECT COUNT(DISTINCT user_id)::int FROM subscriptions WHERE status = 'active') AS active_subscriptions,
-          (SELECT COUNT(DISTINCT user_id)::int FROM payments WHERE status = 'captured') AS paid_users,
-          (SELECT COALESCE(SUM(amount), 0)::bigint FROM payments WHERE status = 'captured') AS revenue_captured
+          (SELECT COUNT(DISTINCT user_id)::int FROM payments WHERE status = 'completed') AS paid_users,
+          (SELECT COALESCE(SUM(amount), 0)::bigint FROM payments WHERE status = 'completed') AS revenue_captured
       `),
       db.query(`
-        SELECT id, full_name, email, business_name, created_at, last_login_at
+        SELECT id, full_name, email, business_name, role, created_at, last_login_at
         FROM users
         ORDER BY created_at DESC
         LIMIT 20
@@ -110,5 +110,31 @@ exports.createPlan = async (req, res) => {
     logger.error('Create plan error', { error: error.message, slug: normalizedSlug });
     req.flash('error', 'Could not create plan. Ensure slug is unique.');
   }
+  return res.redirect('/admin');
+};
+
+exports.updateUserRole = async (req, res) => {
+  const allowed = ['user', 'moderator', 'admin'];
+  const role = (req.body.role || '').toLowerCase();
+
+  if (!allowed.includes(role)) {
+    req.flash('error', 'Invalid role selected.');
+    return res.redirect('/admin');
+  }
+
+  try {
+    await db.query('UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2', [role, req.params.userId]);
+
+    if (req.session.user?.id === req.params.userId) {
+      req.session.user.role = role;
+      req.session.user.is_admin = role === 'admin';
+    }
+
+    req.flash('success', 'User role updated successfully.');
+  } catch (error) {
+    logger.error('Update user role error', { error: error.message, userId: req.params.userId, role });
+    req.flash('error', 'Could not update user role.');
+  }
+
   return res.redirect('/admin');
 };

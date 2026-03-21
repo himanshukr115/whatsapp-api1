@@ -9,13 +9,23 @@
 <section class="card" style="margin-top:18px; overflow:auto;">
   <h3 style="margin-bottom:10px;">Latest Registrations</h3>
   <table class="table">
-    <thead><tr><th>Name</th><th>Email</th><th>Business</th><th>Registered</th><th>Last Login</th></tr></thead>
+    <thead><tr><th>Name</th><th>Email</th><th>Business</th><th>Role</th><th>Registered</th><th>Last Login</th></tr></thead>
     <tbody>
       <% recentUsers.forEach((user) => { %>
         <tr>
           <td><%= user.full_name %></td>
           <td><%= user.email %></td>
           <td><%= user.business_name || '—' %></td>
+          <td>
+            <form action="/admin/users/<%= user.id %>/role" method="POST" style="display:flex;gap:8px;align-items:center;">
+              <select name="role" class="form-select" style="min-width:130px;padding:6px 10px;">
+                <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
+                <option value="moderator" <%= user.role === 'moderator' ? 'selected' : '' %>>Moderator</option>
+                <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+              </select>
+              <button class="btn-sm-ghost" type="submit">Save</button>
+            </form>
+          </td>
           <td><%= new Date(user.created_at).toLocaleString() %></td>
           <td><%= user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never' %></td>
         </tr>
