@@ -236,7 +236,7 @@ router.get('/posts/:accountId', requireAuth, async (req, res) => {
     const postsRes = await axios.get(`https://graph.facebook.com/v19.0/${ig.ig_user_id}/media`, {
       params: {
         access_token: ig.access_token,
-        fields: 'id,caption,media_type,media_url,thumbnail_url,timestamp,like_count,comments_count,permalink',
+        fields: 'id,caption,media_type,media_product_type,media_url,thumbnail_url,timestamp,like_count,comments_count,permalink',
         limit: 20,
       },
     });
