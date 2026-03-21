@@ -64,7 +64,12 @@ exports.index = async (req, res) => {
       stats: summary.rows[0],
       recentUsers: recentUsers.rows,
       paidUsers: paidUsers.rows,
-      plans: plans.rows,
+      plans: plans.rows.map((plan) => ({
+        ...plan,
+        yearly_discount_percent: plan.price_monthly > 0
+          ? Math.max(0, Math.round((1 - (Number(plan.price_yearly || 0) / (Number(plan.price_monthly) * 12))) * 100))
+          : 0,
+      })),
     });
   } catch (error) {
     logger.error('Admin dashboard error', { error: error.message });
