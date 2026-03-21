@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   email         VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  role          VARCHAR(20) NOT NULL DEFAULT 'user',
   full_name     VARCHAR(255) NOT NULL,
   business_name VARCHAR(255),
   avatar_url    VARCHAR(500),
@@ -229,8 +230,12 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─── Backward-compatible alter statements ──────────────────────────────────
 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('user', 'admin', 'moderator'));
 ALTER TABLE users ALTER COLUMN is_active SET DEFAULT TRUE;
 UPDATE users SET is_active = TRUE WHERE is_active IS NULL;
+UPDATE users SET role = 'user' WHERE role IS NULL OR role NOT IN ('user', 'admin', 'moderator');
 CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
 `;
 

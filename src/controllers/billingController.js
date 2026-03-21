@@ -29,6 +29,8 @@ exports.showBilling = async (req, res) => {
       currentSubscription: subscription.rows[0] || null,
       payments: payments.rows,
       razorpayKey: process.env.RAZORPAY_KEY_ID,
+      cashfreeEnabled: Boolean(process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY),
+      razorpayEnabled: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
     });
   } catch (err) {
     logger.error('Billing page error', { error: err.message });
@@ -41,6 +43,9 @@ exports.showBilling = async (req, res) => {
 exports.createRazorpayOrder = async (req, res) => {
   const { plan_slug, billing_cycle } = req.body;
   try {
+    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+      return res.status(400).json({ error: 'Razorpay is not configured.' });
+    }
     const plan = await db.query("SELECT * FROM plans WHERE slug = $1 AND is_active = TRUE", [plan_slug]);
     if (!plan.rows.length) return res.status(404).json({ error: 'Plan not found' });
 
@@ -126,6 +131,9 @@ exports.verifyRazorpay = async (req, res) => {
 exports.createCashfreeOrder = async (req, res) => {
   const { plan_slug, billing_cycle } = req.body;
   try {
+    if (!process.env.CASHFREE_APP_ID || !process.env.CASHFREE_SECRET_KEY) {
+      return res.status(400).json({ error: 'Cashfree is not configured.' });
+    }
     const plan = await db.query("SELECT * FROM plans WHERE slug = $1 AND is_active = TRUE", [plan_slug]);
     if (!plan.rows.length) return res.status(404).json({ error: 'Plan not found' });
 
@@ -201,6 +209,53 @@ exports.cashfreeCallback = async (req, res) => {
     req.flash('error', 'Payment verification failed.');
   }
   res.redirect('/billing');
+};
+
+exports.directCheckout = async (req, res) => {
+  const { plan_slug, billing_cycle } = req.body;
+  const billingCycle = billing_cycle === 'yearly' ? 'yearly' : 'monthly';
+
+  try {
+    const plan = await db.query("SELECT * FROM plans WHERE slug = $1 AND is_active = TRUE", [plan_slug]);
+    if (!plan.rows.length) {
+      req.flash('error', 'Plan not found.');
+      return res.redirect('/billing');
+    }
+
+    const p = plan.rows[0];
+    const amount = billingCycle === 'yearly' ? p.price_yearly : p.price_monthly;
+    const orderId = `MANUAL_${Date.now()}`;
+    const paymentId = `manual_${Date.now()}`;
+
+    await db.query(`
+      INSERT INTO payments (user_id, plan_id, amount, currency, status, gateway, gateway_order_id, gateway_payment_id, metadata)
+      VALUES ($1, $2, $3, 'INR', 'completed', 'manual', $4, $5, $6)
+    `, [req.session.user.id, p.id, amount, orderId, paymentId, JSON.stringify({ billing_cycle: billingCycle, source: 'direct_checkout' })]);
+
+    await activateSubscription(req.session.user.id, p.slug, billingCycle, 'manual', orderId, paymentId, null);
+
+    req.flash('success', `Plan upgraded to ${p.name} (${billingCycle}).`);
+    return res.redirect('/billing');
+  } catch (error) {
+    logger.error('Direct checkout error', { error: error.message, userId: req.session.user.id, plan: plan_slug });
+    req.flash('error', 'Could not complete checkout.');
+    return res.redirect('/billing');
+  }
+};
+
+exports.cancelSubscription = async (req, res) => {
+  try {
+    await db.query(`
+      UPDATE subscriptions
+      SET cancel_at_period_end = TRUE, updated_at = NOW()
+      WHERE user_id = $1 AND status = 'active'
+    `, [req.session.user.id]);
+    req.flash('success', 'Subscription cancellation scheduled at period end.');
+  } catch (error) {
+    logger.error('Cancel subscription error', { error: error.message, userId: req.session.user.id });
+    req.flash('error', 'Unable to cancel subscription right now.');
+  }
+  return res.redirect('/billing');
 };
 
 // ── Razorpay Webhook ──────────────────────────────────────────────────────

@@ -29,9 +29,9 @@ async function seed() {
     // Demo admin user
     const hash = await bcrypt.hash('Admin@12345', 12);
     await client.query(`
-      INSERT INTO users (email, password_hash, full_name, business_name, email_verified)
-      VALUES ('admin@flowgram.in', $1, 'Admin User', 'FlowGram', TRUE)
-      ON CONFLICT (email) DO NOTHING;
+      INSERT INTO users (email, password_hash, role, full_name, business_name, email_verified)
+      VALUES ('admin@flowgram.in', $1, 'admin', 'Admin User', 'FlowGram', TRUE)
+      ON CONFLICT (email) DO UPDATE SET role = 'admin';
     `, [hash]);
 
     console.log('✅ Seeding completed');

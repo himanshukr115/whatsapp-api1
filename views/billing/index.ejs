@@ -62,6 +62,9 @@
       <button class="btn-plan-ghost-dash" disabled>Free Forever</button>
     <% } else { %>
       <div class="payment-btns">
+        <button class="btn-razorpay" onclick="startCheckout('<%= plan.slug %>')">
+          Upgrade / Buy Now
+        </button>
         <button class="btn-razorpay" onclick="payWithRazorpay('<%= plan.slug %>')">
           Pay with Razorpay
         </button>
@@ -114,6 +117,8 @@
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <script>
 let currentCycle = 'monthly';
+const razorpayEnabled = <%= razorpayEnabled ? 'true' : 'false' %>;
+const cashfreeEnabled = <%= cashfreeEnabled ? 'true' : 'false' %>;
 
 function switchCycle() {
   const yearly = document.getElementById('billingCycleToggle').checked;
@@ -125,6 +130,10 @@ function switchCycle() {
 }
 
 async function payWithRazorpay(planSlug) {
+  if (!razorpayEnabled) {
+    alert('Razorpay is not configured right now. Use Upgrade / Buy Now.');
+    return;
+  }
   try {
     const res = await fetch('/billing/razorpay/order', {
       method: 'POST',
@@ -160,6 +169,10 @@ async function payWithRazorpay(planSlug) {
 }
 
 async function payWithCashfree(planSlug) {
+  if (!cashfreeEnabled) {
+    alert('Cashfree is not configured right now. Use Upgrade / Buy Now.');
+    return;
+  }
   try {
     const res = await fetch('/billing/cashfree/order', {
       method: 'POST',
@@ -181,5 +194,30 @@ async function payWithCashfree(planSlug) {
   } catch (e) {
     alert('Payment failed. Please try again.');
   }
+}
+
+function startCheckout(planSlug) {
+  if (razorpayEnabled) return payWithRazorpay(planSlug);
+  if (cashfreeEnabled) return payWithCashfree(planSlug);
+  if (!confirm('Payment gateways are not configured. Continue with direct manual checkout?')) return;
+
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = '/billing/checkout';
+
+  const planInput = document.createElement('input');
+  planInput.type = 'hidden';
+  planInput.name = 'plan_slug';
+  planInput.value = planSlug;
+
+  const cycleInput = document.createElement('input');
+  cycleInput.type = 'hidden';
+  cycleInput.name = 'billing_cycle';
+  cycleInput.value = currentCycle;
+
+  form.appendChild(planInput);
+  form.appendChild(cycleInput);
+  document.body.appendChild(form);
+  form.submit();
 }
 </script>

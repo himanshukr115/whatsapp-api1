@@ -121,7 +121,8 @@ router.get('/connect/oauth', requireAuth, (req, res) => {
     return res.redirect('/settings');
   }
 
-  const redirectUri = `${process.env.APP_URL}/instagram/oauth/callback`;
+  const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+  const redirectUri = `${appUrl}/instagram/oauth/callback`;
   const scope = [
     'instagram_basic',
     'instagram_manage_messages',
@@ -132,13 +133,14 @@ router.get('/connect/oauth', requireAuth, (req, res) => {
     'business_management',
   ].join(',');
 
-  const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code&state=${req.session.user.id}`;
+  req.session.ig_oauth_state = `${req.session.user.id}:${Date.now()}`;
+  const url = `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.META_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&response_type=code&state=${encodeURIComponent(req.session.ig_oauth_state)}`;
   res.redirect(url);
 });
 
 // ── OAuth Callback ────────────────────────────────────────────────────────
 router.get('/oauth/callback', requireAuth, async (req, res) => {
-  const { code, error: oauthError } = req.query;
+  const { code, state, error: oauthError } = req.query;
 
   if (oauthError) {
     req.flash('error', 'Instagram connection was cancelled.');
@@ -149,9 +151,15 @@ router.get('/oauth/callback', requireAuth, async (req, res) => {
     req.flash('error', 'No authorization code received.');
     return res.redirect('/settings?tab=instagram');
   }
+  if (!state || !req.session.ig_oauth_state || state !== req.session.ig_oauth_state) {
+    req.flash('error', 'Invalid Instagram OAuth state. Please try connecting again.');
+    return res.redirect('/settings?tab=instagram');
+  }
+  delete req.session.ig_oauth_state;
 
   try {
-    const redirectUri = `${process.env.APP_URL}/instagram/oauth/callback`;
+    const appUrl = process.env.APP_URL || `${req.protocol}://${req.get('host')}`;
+    const redirectUri = `${appUrl}/instagram/oauth/callback`;
     const tokenRes = await axios.get('https://graph.facebook.com/v19.0/oauth/access_token', {
       params: {
         client_id: process.env.META_APP_ID,
