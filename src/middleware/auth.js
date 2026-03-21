@@ -19,7 +19,13 @@ exports.requireGuest = (req, res, next) => {
 
 exports.requireAdmin = async (req, res, next) => {
   const sessionRole = req.session?.user?.role || 'user';
-  if (sessionRole === 'admin') return next();
+  // Also support legacy sessions that may have is_admin but not role
+  const sessionIsAdmin = req.session?.user?.is_admin === true;
+  if (sessionRole === 'admin' || sessionIsAdmin) {
+    // Keep is_admin in sync
+    if (req.session?.user) req.session.user.is_admin = true;
+    return next();
+  }
 
   try {
     const userId = req.session?.user?.id;

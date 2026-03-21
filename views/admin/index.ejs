@@ -87,9 +87,10 @@
                 <input class="form-input" name="sort_order" type="number" value="<%= plan.sort_order %>">
                 <div style="display:flex;gap:6px;">
                   <button class="btn-sm-ghost" type="submit">Save</button>
-                  <button class="btn-sm-danger" type="submit" formaction="/admin/plans/<%= plan.id %>/delete" formmethod="POST" data-confirm="Delete this plan?">Delete</button>
+                  <button class="btn-sm-danger" type="button" onclick="deletePlan('<%= plan.id %>', '<%= plan.name %>')">Delete</button>
                 </div>
               </form>
+              <form id="delete-plan-<%= plan.id %>" action="/admin/plans/<%= plan.id %>/delete" method="POST" style="display:none"></form>
             </td>
           </tr>
         <% }) %>
@@ -114,3 +115,11 @@
     </table>
   </div>
 </section>
+
+
+<script>
+function deletePlan(planId, planName) {
+  if (!confirm('Delete plan "' + planName + '"? This cannot be undone.')) return;
+  document.getElementById('delete-plan-' + planId).submit();
+}
+</script>

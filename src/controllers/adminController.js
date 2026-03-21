@@ -21,6 +21,11 @@ const computeYearlyPrice = (monthlyPaise, discountPercent, explicitYearly) => {
 
 exports.index = async (req, res) => {
   try {
+    // Ensure yearly_discount_percent column exists
+    await db.query(`
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS yearly_discount_percent INTEGER DEFAULT 0
+    `).catch(() => {});
+
     const [summary, recentUsers, paidUsers, plans] = await Promise.all([
       db.query(`
         SELECT
@@ -66,9 +71,14 @@ exports.index = async (req, res) => {
       paidUsers: paidUsers.rows,
       plans: plans.rows.map((plan) => ({
         ...plan,
-        yearly_discount_percent: plan.price_monthly > 0
+        features: Array.isArray(plan.features)
+          ? plan.features
+          : (typeof plan.features === 'string'
+              ? (() => { try { return JSON.parse(plan.features); } catch (_) { return []; } })()
+              : []),
+        yearly_discount_percent: plan.price_monthly > 0 && plan.price_yearly > 0
           ? Math.max(0, Math.round((1 - (Number(plan.price_yearly || 0) / (Number(plan.price_monthly) * 12))) * 100))
-          : 0,
+          : (plan.yearly_discount_percent || 0),
       })),
     });
   } catch (error) {

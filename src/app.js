@@ -81,7 +81,12 @@ app.set('layout extractStyles', true);
 
 // ── Global template vars ──────────────────────────────────────────────────
 app.use((req, res, next) => {
-  res.locals.user = req.session.user || null;
+  const sessionUser = req.session.user || null;
+  // Normalize is_admin for templates (handles legacy sessions without is_admin stored)
+  if (sessionUser && sessionUser.is_admin === undefined) {
+    sessionUser.is_admin = sessionUser.role === 'admin';
+  }
+  res.locals.user = sessionUser;
   res.locals.success = req.flash('success');
   res.locals.error = req.flash('error');
   res.locals.appName = process.env.APP_NAME || 'FlowGram';

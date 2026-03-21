@@ -8,15 +8,23 @@ const logger = require('../utils/logger');
 // ── Show Billing Page ─────────────────────────────────────────────────────
 exports.showBilling = async (req, res) => {
   try {
+    // Ensure yearly_discount_percent column exists (safe migration guard)
+    await db.query(`
+      ALTER TABLE plans ADD COLUMN IF NOT EXISTS yearly_discount_percent INTEGER DEFAULT 0
+    `).catch(() => {});
+
     const [plans, subscription, payments] = await Promise.all([
       db.query(`
         SELECT *,
-          GREATEST(0, LEAST(100, COALESCE(yearly_discount_percent,
-            CASE WHEN price_monthly > 0 AND price_yearly > 0
-              THEN ROUND((1 - (price_yearly::numeric / (price_monthly::numeric * 12))) * 100)
+          GREATEST(0, LEAST(100,
+            CASE
+              WHEN yearly_discount_percent IS NOT NULL AND yearly_discount_percent > 0
+                THEN yearly_discount_percent
+              WHEN price_monthly > 0 AND price_yearly > 0
+                THEN ROUND((1 - (price_yearly::numeric / (price_monthly::numeric * 12))) * 100)
               ELSE 0
             END
-          )))::int AS yearly_discount_percent
+          ))::int AS yearly_discount_pct
         FROM plans
         WHERE is_active = TRUE
         ORDER BY sort_order
@@ -33,16 +41,27 @@ exports.showBilling = async (req, res) => {
       `, [req.session.user.id]),
     ]);
 
+    // Normalize each plan: ensure features is always an array, unify discount field name
+    const normalizedPlans = plans.rows.map(plan => ({
+      ...plan,
+      yearly_discount_percent: plan.yearly_discount_pct || plan.yearly_discount_percent || 0,
+      features: Array.isArray(plan.features)
+        ? plan.features
+        : (typeof plan.features === 'string'
+            ? (() => { try { return JSON.parse(plan.features); } catch { return []; } })()
+            : []),
+    }));
+
     res.render('billing/index', {
       layout: 'layouts/dashboard',
       title: 'Billing & Plans',
-      plans: plans.rows,
+      plans: normalizedPlans,
       currentSubscription: subscription.rows[0] || null,
       payments: payments.rows,
       razorpayKey: process.env.RAZORPAY_KEY_ID,
       cashfreeEnabled: Boolean(process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY),
       razorpayEnabled: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
-      maxYearlyDiscount: plans.rows.reduce((max, plan) => Math.max(max, plan.yearly_discount_percent || 0), 0),
+      maxYearlyDiscount: normalizedPlans.reduce((max, plan) => Math.max(max, plan.yearly_discount_percent || 0), 0),
     });
   } catch (err) {
     logger.error('Billing page error', { error: err.message });
