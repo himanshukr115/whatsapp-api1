@@ -9,7 +9,12 @@ const logger = require('../utils/logger');
 exports.showBilling = async (req, res) => {
   try {
     const [plans, subscription, payments] = await Promise.all([
-      db.query("SELECT * FROM plans WHERE is_active = TRUE ORDER BY sort_order"),
+      db.query(`
+        SELECT *
+        FROM plans
+        WHERE is_active = TRUE
+        ORDER BY sort_order
+      `),
       db.query(`
         SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.price_monthly, p.features
         FROM subscriptions s JOIN plans p ON p.id = s.plan_id
@@ -22,15 +27,23 @@ exports.showBilling = async (req, res) => {
       `, [req.session.user.id]),
     ]);
 
+    const computedPlans = plans.rows.map((plan) => ({
+      ...plan,
+      yearly_discount_percent: plan.price_monthly > 0
+        ? Math.max(0, Math.round((1 - (Number(plan.price_yearly || 0) / (Number(plan.price_monthly) * 12))) * 100))
+        : 0,
+    }));
+
     res.render('billing/index', {
       layout: 'layouts/dashboard',
       title: 'Billing & Plans',
-      plans: plans.rows,
+      plans: computedPlans,
       currentSubscription: subscription.rows[0] || null,
       payments: payments.rows,
       razorpayKey: process.env.RAZORPAY_KEY_ID,
       cashfreeEnabled: Boolean(process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY),
       razorpayEnabled: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
+      maxYearlyDiscount: computedPlans.reduce((max, plan) => Math.max(max, plan.yearly_discount_percent || 0), 0),
     });
   } catch (err) {
     logger.error('Billing page error', { error: err.message });
