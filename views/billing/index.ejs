@@ -28,7 +28,7 @@
     <input type="checkbox" id="billingCycleToggle" onchange="switchCycle()">
     <span class="billing-toggle-track"></span>
   </label>
-  <span id="toggleYearly" class="billing-toggle-label">Yearly <span class="save-badge">Save 17%</span></span>
+  <span id="toggleYearly" class="billing-toggle-label">Yearly <span class="save-badge">Save up to <%= maxYearlyDiscount %>%</span></span>
 </div>
 
 <!-- Plans -->
@@ -62,13 +62,13 @@
       <button class="btn-plan-ghost-dash" disabled>Free Forever</button>
     <% } else { %>
       <div class="payment-btns">
-        <button class="btn-razorpay" onclick="startCheckout('<%= plan.slug %>')">
+        <button type="button" class="btn-razorpay" onclick="startCheckout('<%= plan.slug %>')">
           Upgrade / Buy Now
         </button>
-        <button class="btn-razorpay" onclick="payWithRazorpay('<%= plan.slug %>')">
+        <button type="button" class="btn-razorpay" onclick="payWithRazorpay('<%= plan.slug %>')">
           Pay with Razorpay
         </button>
-        <button class="btn-cashfree" onclick="payWithCashfree('<%= plan.slug %>')">
+        <button type="button" class="btn-cashfree" onclick="payWithCashfree('<%= plan.slug %>')">
           Pay with Cashfree
         </button>
       </div>

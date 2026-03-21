@@ -9,7 +9,18 @@ const logger = require('../utils/logger');
 exports.showBilling = async (req, res) => {
   try {
     const [plans, subscription, payments] = await Promise.all([
-      db.query("SELECT * FROM plans WHERE is_active = TRUE ORDER BY sort_order"),
+      db.query(`
+        SELECT *,
+          GREATEST(0, LEAST(100, COALESCE(yearly_discount_percent,
+            CASE WHEN price_monthly > 0 AND price_yearly > 0
+              THEN ROUND((1 - (price_yearly::numeric / (price_monthly::numeric * 12))) * 100)
+              ELSE 0
+            END
+          )))::int AS yearly_discount_percent
+        FROM plans
+        WHERE is_active = TRUE
+        ORDER BY sort_order
+      `),
       db.query(`
         SELECT s.*, p.name as plan_name, p.slug as plan_slug, p.price_monthly, p.features
         FROM subscriptions s JOIN plans p ON p.id = s.plan_id
@@ -31,6 +42,7 @@ exports.showBilling = async (req, res) => {
       razorpayKey: process.env.RAZORPAY_KEY_ID,
       cashfreeEnabled: Boolean(process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY),
       razorpayEnabled: Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET),
+      maxYearlyDiscount: plans.rows.reduce((max, plan) => Math.max(max, plan.yearly_discount_percent || 0), 0),
     });
   } catch (err) {
     logger.error('Billing page error', { error: err.message });
