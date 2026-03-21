@@ -2,24 +2,11 @@
 const logger = require('../utils/logger');
 
 exports.requireAuth = (req, res, next) => {
-  logger.info('Auth check', { 
-    path: req.path,
-    hasSession: !!req.session, 
-    hasUser: !!req.session?.user,
-    userId: req.session?.user?.id || null,
-    sessionID: req.sessionID,
-    cookies: req.cookies ? Object.keys(req.cookies) : []
-  });
-  
   if (req.session && req.session.user) {
-    logger.info('Auth passed', { userId: req.session.user.id });
     return next();
   }
   
-  logger.warn('Auth rejected - no user in session', { 
-    path: req.path,
-    sessionID: req.sessionID
-  });
+  logger.warn('Auth rejected - no user in session', { path: req.path });
   req.flash('error', 'Please log in to continue.');
   return res.redirect('/auth/login');
 };
@@ -43,6 +30,10 @@ exports.requireAdmin = (req, res, next) => {
 exports.requirePlan = (minPlan) => (req, res, next) => {
   const planOrder = { free: 0, pro: 1, business: 2 };
   const userPlan = req.session.user?.plan_slug || 'free';
+  if (typeof planOrder[minPlan] === 'undefined') {
+    logger.warn('Invalid plan requirement configured', { minPlan });
+    return res.redirect('/dashboard');
+  }
   if (planOrder[userPlan] >= planOrder[minPlan]) return next();
   req.flash('error', `This feature requires the ${minPlan} plan or higher.`);
   return res.redirect('/billing');

@@ -32,14 +32,22 @@ const baseTemplate = (content) => `
 
 async function send(to, subject, html) {
   try {
-    if (!process.env.SMTP_HOST || process.env.SMTP_HOST === 'smtp.sendgrid.net' && !process.env.SMTP_PASS?.startsWith('SG')) {
-      logger.warn('SMTP not configured, skipping email', { to, subject });
-      return;
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      logger.warn('SMTP not configured, skipping email', {
+        to,
+        subject,
+        hasHost: !!process.env.SMTP_HOST,
+        hasUser: !!process.env.SMTP_USER,
+        hasPass: !!process.env.SMTP_PASS,
+      });
+      return false;
     }
     await transporter.sendMail({ from, to, subject, html });
     logger.info('Email sent', { to, subject });
+    return true;
   } catch (err) {
     logger.error('Email send error', { error: err.message, to, subject });
+    return false;
   }
 }
 

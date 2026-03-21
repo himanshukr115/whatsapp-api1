@@ -5,12 +5,13 @@ const db = require('../../config/database');
 
 // Stats for dashboard charts
 router.get('/stats/chart', requireAuth, async (req, res) => {
-  const { days = 7 } = req.query;
+  const parsedDays = Number.parseInt(req.query.days, 10);
+  const days = Number.isNaN(parsedDays) ? 7 : Math.max(1, Math.min(parsedDays, 90));
   const data = await db.query(`
     SELECT DATE(sent_at) as day, COUNT(*) as count
-    FROM messages WHERE user_id=$1 AND direction='out' AND sent_at >= NOW() - INTERVAL '${parseInt(days)} days'
+    FROM messages WHERE user_id=$1 AND direction='out' AND sent_at >= NOW() - ($2::int * INTERVAL '1 day')
     GROUP BY DATE(sent_at) ORDER BY day
-  `, [req.session.user.id]);
+  `, [req.session.user.id, days]);
   res.json(data.rows);
 });
 

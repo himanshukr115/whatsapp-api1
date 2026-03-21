@@ -69,10 +69,14 @@ exports.register = async (req, res) => {
     }
 
     // Send verification email
-    await emailService.sendVerificationEmail(email, full_name, verify_token);
+    const emailSent = await emailService.sendVerificationEmail(email, full_name, verify_token);
 
     logger.info('New user registered', { userId: user.id, email });
-    req.flash('success', 'Account created! Please check your email to verify your account.');
+    if (emailSent) {
+      req.flash('success', 'Account created! Please check your email to verify your account.');
+    } else {
+      req.flash('error', 'Account created, but verification email could not be sent. Please use resend verification after login.');
+    }
     res.redirect('/auth/login');
   } catch (err) {
     logger.error('Register error', { error: err.message });
@@ -151,14 +155,7 @@ exports.login = async (req, res) => {
           errors: ['Session error. Please try again.'], formData: { email }
         });
       }
-      logger.info('Session saved successfully', { userId: user.id, sessionId: req.sessionID });
-      logger.info('Session contents before redirect', { user: req.session.user });
-      logger.info('About to redirect to /dashboard', { userId: user.id, statusCode: 302 });
       req.flash('success', `Welcome back, ${user.full_name}!`);
-      logger.info('Response headers before redirect', { 
-        'set-cookie': res.getHeader('set-cookie'),
-        location: '/dashboard'
-      });
       res.redirect(302, '/dashboard');
     });
   } catch (err) {
@@ -197,6 +194,47 @@ exports.googleLogin = (req, res) => {
   });
 
   return res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+};
+
+exports.resendVerification = async (req, res) => {
+  const userEmail = req.session?.user?.email;
+  if (!userEmail) {
+    req.flash('error', 'Please log in first.');
+    return res.redirect('/auth/login');
+  }
+
+  try {
+    const { rows } = await db.query(
+      'SELECT id, full_name, email_verified FROM users WHERE email = $1 LIMIT 1',
+      [userEmail.toLowerCase()]
+    );
+
+    if (!rows.length) {
+      req.flash('error', 'User not found.');
+      return res.redirect('/dashboard');
+    }
+
+    const user = rows[0];
+    if (user.email_verified) {
+      req.flash('success', 'Your email is already verified.');
+      return res.redirect('/dashboard');
+    }
+
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    await db.query('UPDATE users SET email_verify_token = $1 WHERE id = $2', [verifyToken, user.id]);
+    const emailSent = await emailService.sendVerificationEmail(userEmail, user.full_name, verifyToken);
+
+    if (emailSent) {
+      req.flash('success', 'Verification email sent. Please check your inbox.');
+    } else {
+      req.flash('error', 'Unable to send verification email right now. Please contact support.');
+    }
+    return res.redirect('/dashboard');
+  } catch (err) {
+    logger.error('Resend verification error', { error: err.message, email: userEmail });
+    req.flash('error', 'Failed to resend verification email.');
+    return res.redirect('/dashboard');
+  }
 };
 
 exports.googleCallback = async (req, res) => {
