@@ -1,0 +1,57 @@
+<!-- ══════════════════════════════════════════════════════════════
+     PASTE THIS BLOCK at the TOP of views/dashboard/index.ejs
+     (right after the page-header div, before the stats-grid)
+══════════════════════════════════════════════════════════════ -->
+
+<% if (typeof igAccounts !== 'undefined' && igAccounts.length === 0) { %>
+<div id="igConnectBanner" style="
+  background: linear-gradient(135deg, rgba(240,148,51,0.1), rgba(188,24,136,0.08));
+  border: 1px solid rgba(220,39,67,0.2);
+  border-radius: 16px; padding: 22px 24px;
+  display: flex; align-items: center; gap: 20px;
+  margin-bottom: 20px; position: relative; overflow: hidden;
+">
+  <!-- Subtle gradient blob bg -->
+  <div style="position:absolute;right:-40px;top:-40px;width:180px;height:180px;background:radial-gradient(circle,rgba(188,24,136,0.12),transparent 70%);pointer-events:none"></div>
+
+  <!-- IG icon -->
+  <div style="
+    width:54px;height:54px;border-radius:14px;flex-shrink:0;
+    background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);
+    display:flex;align-items:center;justify-content:center;font-size:26px;
+    box-shadow:0 4px 16px rgba(188,24,136,0.35)
+  ">📸</div>
+
+  <div style="flex:1;min-width:0">
+    <div style="font-family:'Syne',sans-serif;font-size:16px;font-weight:800;margin-bottom:4px">
+      Connect your Instagram account
+    </div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.5">
+      Link your Instagram Business or Creator account to start automating DMs, keyword replies, and comment flows.
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <a href="/settings?tab=instagram" style="
+      display:inline-flex;align-items:center;gap:8px;
+      padding:10px 18px;
+      background:linear-gradient(135deg,#f09433,#dc2743,#bc1888);
+      color:white;border-radius:8px;text-decoration:none;
+      font-size:13.5px;font-weight:600;white-space:nowrap;
+      box-shadow:0 4px 12px rgba(188,24,136,0.3);
+      transition:opacity 0.15s
+    " onmouseover="this.style.opacity='0.88'" onmouseout="this.style.opacity='1'">
+      📸 Connect Instagram
+    </a>
+    <button onclick="this.closest('#igConnectBanner').style.display='none'" style="
+      background:rgba(255,255,255,0.05);border:none;color:var(--text3);
+      width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:16px;
+      display:flex;align-items:center;justify-content:center;transition:color 0.15s
+    " onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--text3)'"
+       title="Dismiss">×</button>
+  </div>
+</div>
+<% } %>
+<!-- ══════════════════════════════════════════════════════════════
+     END BANNER
+══════════════════════════════════════════════════════════════ -->

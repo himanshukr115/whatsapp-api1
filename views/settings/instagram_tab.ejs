@@ -1,0 +1,543 @@
+<!-- views/settings/instagram.ejs — Drop-in replacement for the instagram tab in settings/index.ejs -->
+<!-- Also include the connect modal at bottom of settings/index.ejs -->
+
+<!-- ══ INSTAGRAM TAB PANEL ══ -->
+<div class="settings-panel" id="tab-instagram">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="settings-section-title">Connected Instagram Accounts</h3>
+      <button class="btn-primary" style="font-size:13px;padding:8px 16px" onclick="openIgModal()">
+        + Connect Account
+      </button>
+    </div>
+
+    <% if (igAccounts.length === 0) { %>
+    <!-- Empty state with inline connect prompt -->
+    <div style="text-align:center;padding:36px 20px">
+      <div style="font-size:52px;margin-bottom:12px">📸</div>
+      <h4 style="font-family:'Syne',sans-serif;font-size:16px;font-weight:700;margin-bottom:8px">No Instagram account connected</h4>
+      <p style="font-size:13px;color:var(--text2);line-height:1.7;max-width:420px;margin:0 auto 20px">Connect your Instagram Business or Creator account to start automating DMs, replies, and keyword flows.</p>
+      <button class="btn-primary" onclick="openIgModal()">Connect Instagram Account</button>
+    </div>
+    <% } else { %>
+    <% igAccounts.forEach(acc => { %>
+    <div class="ig-account-row">
+      <div class="ig-avatar-sm"><%= (acc.username||'I').charAt(0).toUpperCase() %></div>
+      <div class="ig-account-info">
+        <strong>@<%= acc.username %></strong>
+        <span class="ig-followers"><%= (acc.followers_count || 0).toLocaleString('en-IN') %> followers</span>
+      </div>
+      <span class="badge <%= acc.is_active ? 'badge-green' : 'badge-red' %>">
+        <%= acc.is_active ? '● Connected' : '● Disconnected' %>
+      </span>
+      <button class="btn-sm-ghost" onclick="openPostSelector('<%= acc.id %>', '@<%= acc.username %>')">
+        📌 Posts & Keywords
+      </button>
+      <form action="/settings/ig/<%= acc.id %>/disconnect" method="POST" onsubmit="return confirm('Disconnect this account?')">
+        <button class="btn-sm-danger">Disconnect</button>
+      </form>
+    </div>
+    <% }) %>
+    <% } %>
+  </div>
+
+  <!-- Requirements info -->
+  <div class="info-banner" style="margin-top:16px">
+    <strong>📋 Meta Requirements to Connect Instagram</strong>
+    <ul style="margin-top:10px;padding-left:20px;line-height:2.2;font-size:13px;color:var(--text2)">
+      <li>Instagram must be a <strong>Business</strong> or <strong>Creator</strong> account (not personal)</li>
+      <li>Instagram must be <strong>linked to a Facebook Page</strong></li>
+      <li>You need a <strong>Meta Developer App</strong> with Instagram Graph API access</li>
+      <li>Required permissions: <code>instagram_basic</code>, <code>instagram_manage_messages</code>, <code>instagram_manage_comments</code>, <code>pages_show_list</code></li>
+      <li>FlowGram uses <strong>only the official Meta Graph API</strong> — 100% compliant, no password stored</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══ CONNECT INSTAGRAM MODAL ══ -->
+<div id="igConnectModal" style="
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,0.85); backdrop-filter:blur(8px);
+  z-index:9999; align-items:center; justify-content:center; padding:20px
+" onclick="if(event.target===this)closeIgModal()">
+
+  <div style="
+    width:100%; max-width:540px;
+    background:var(--surface); border:1px solid var(--border2);
+    border-radius:20px; box-shadow:0 8px 40px rgba(0,0,0,0.6);
+    overflow:hidden;
+    animation: slideUp 0.28s cubic-bezier(0.34,1.56,0.64,1)
+  ">
+    <!-- Gradient header -->
+    <div style="background:linear-gradient(135deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888);padding:24px 28px;position:relative">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:12px">
+          <div style="width:44px;height:44px;background:rgba(255,255,255,0.2);border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px">📸</div>
+          <div>
+            <div style="font-family:'Syne',sans-serif;font-size:20px;font-weight:800;color:#fff">Connect Instagram</div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,0.75)">Link your Business or Creator account</div>
+          </div>
+        </div>
+        <button onclick="closeIgModal()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:30px;height:30px;border-radius:50%;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">×</button>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:24px 28px">
+
+      <!-- Method tabs -->
+      <div style="display:flex;background:var(--surface2);border-radius:8px;padding:3px;gap:3px;margin-bottom:20px">
+        <button class="ig-method-tab active" data-tab="ig-oauth" onclick="switchIgTab('ig-oauth',this)" style="flex:1;padding:8px;border:none;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);background:none;cursor:pointer;transition:all 0.15s">🔐 Meta Login</button>
+        <button class="ig-method-tab" data-tab="ig-token" onclick="switchIgTab('ig-token',this)" style="flex:1;padding:8px;border:none;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);background:none;cursor:pointer;transition:all 0.15s">🔑 Access Token</button>
+        <button class="ig-method-tab" data-tab="ig-guide" onclick="switchIgTab('ig-guide',this)" style="flex:1;padding:8px;border:none;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);background:none;cursor:pointer;transition:all 0.15s">📖 Guide</button>
+      </div>
+
+      <!-- OAuth panel -->
+      <div id="ig-oauth" class="ig-tab-panel">
+        <a href="/instagram/connect/oauth" style="display:flex;align-items:center;gap:12px;width:100%;padding:13px 18px;background:#1877f2;color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;margin-bottom:10px;box-sizing:border-box">
+          <span style="font-size:20px">🔵</span>
+          <span>Continue with Facebook / Meta</span>
+        </a>
+        <p style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:14px">Official Meta OAuth — no password stored, fully compliant</p>
+
+        <div style="display:flex;align-items:center;gap:10px;margin:12px 0;color:var(--text3);font-size:12px">
+          <div style="flex:1;height:1px;background:var(--border)"></div>OR<div style="flex:1;height:1px;background:var(--border)"></div>
+        </div>
+
+        <div style="background:rgba(74,222,128,0.06);border:1px solid rgba(74,222,128,0.12);border-radius:8px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start">
+          <span>🛡️</span>
+          <p style="font-size:12px;color:var(--text2);line-height:1.5"><strong style="color:var(--accent3)">100% Meta-compliant.</strong> Uses official Instagram Graph API. Requires Business/Creator account linked to a Facebook Page.</p>
+        </div>
+      </div>
+
+      <!-- Token panel -->
+      <div id="ig-token" class="ig-tab-panel" style="display:none">
+        <div style="background:var(--surface2);border-radius:8px;padding:14px;margin-bottom:14px">
+          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:10px">Quick Steps</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;gap:8px"><span style="width:18px;height:18px;border-radius:50%;background:rgba(124,92,252,0.2);color:var(--accent2);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">1</span><p style="font-size:12.5px;color:var(--text2)">Open <a href="https://developers.facebook.com/tools/explorer" target="_blank" style="color:var(--accent2)">Graph API Explorer</a></p></div>
+            <div style="display:flex;gap:8px"><span style="width:18px;height:18px;border-radius:50%;background:rgba(124,92,252,0.2);color:var(--accent2);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">2</span><p style="font-size:12.5px;color:var(--text2)">Select your App → Add permissions: <code style="font-size:11px;background:var(--surface3);padding:1px 4px;border-radius:3px">instagram_basic</code> + <code style="font-size:11px;background:var(--surface3);padding:1px 4px;border-radius:3px">pages_show_list</code></p></div>
+            <div style="display:flex;gap:8px"><span style="width:18px;height:18px;border-radius:50%;background:rgba(124,92,252,0.2);color:var(--accent2);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">3</span><p style="font-size:12.5px;color:var(--text2)">Generate Access Token → copy & paste below</p></div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+          <label style="font-size:12.5px;font-weight:500;color:var(--text2)">Access Token *</label>
+          <input type="text" id="igTokenInput" class="form-input" placeholder="EAABs... paste your Page or User token" autocomplete="off">
+          <span style="font-size:11.5px;color:var(--text3)">Long-lived tokens (60 days) recommended. We auto-refresh when possible.</span>
+        </div>
+
+        <button onclick="connectIgToken()" id="igTokenBtn" class="btn-primary">Connect Instagram Account</button>
+        <div id="igTokenAlert" style="display:none;margin-top:10px;padding:10px 13px;border-radius:8px;font-size:13px"></div>
+      </div>
+
+      <!-- Guide panel -->
+      <div id="ig-guide" class="ig-tab-panel" style="display:none">
+        <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:14px">
+          <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px">📋 Requirements Checklist</div>
+          <% [
+            ['✓ Business/Creator account', 'Personal accounts cannot use the Instagram API'],
+            ['✓ Linked to Facebook Page', 'Instagram must be connected to a FB Business Page in account settings'],
+            ['✓ Meta Developer App', 'Create at developers.facebook.com with Instagram Graph API product added'],
+            ['✓ Required Permissions', 'instagram_basic, instagram_manage_messages, instagram_manage_comments, pages_show_list'],
+            ['✓ Rate Limits', 'Instagram API: ~200 DMs/hour. FlowGram auto-respects these limits'],
+          ].forEach(([title, desc]) => { %>
+          <div style="display:flex;gap:10px;margin-bottom:10px">
+            <span style="color:var(--accent3);font-size:13px;font-weight:700;flex-shrink:0"><%= title.split(' ')[0] %></span>
+            <div><strong style="font-size:12.5px;color:var(--text)"><%= title.slice(2) %></strong><p style="font-size:12px;color:var(--text2);margin-top:2px"><%= desc %></p></div>
+          </div>
+          <% }) %>
+        </div>
+        <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.15);border-radius:8px;padding:12px 14px">
+          <p style="font-size:12.5px;color:var(--yellow)">⚠️ FlowGram uses <strong>only the official Meta Graph API</strong>. No scraping, no unofficial methods. All automation is within Meta's allowed use policy.</p>
+        </div>
+        <button onclick="switchIgTab('ig-oauth', document.querySelector('.ig-method-tab'))" class="btn-primary" style="margin-top:14px">Connect Now →</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ══ POST + KEYWORD SELECTOR MODAL ══ -->
+<div id="postKwModal" style="
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,0.85);backdrop-filter:blur(8px);
+  z-index:10000;align-items:center;justify-content:center;padding:20px
+" onclick="if(event.target===this)closePostKwModal()">
+  <div style="
+    width:100%;max-width:680px;
+    background:var(--surface);border:1px solid var(--border2);
+    border-radius:20px;box-shadow:0 8px 40px rgba(0,0,0,0.6);
+    max-height:88vh;display:flex;flex-direction:column;
+    animation: slideUp 0.28s cubic-bezier(0.34,1.56,0.64,1)
+  ">
+    <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+      <div>
+        <h3 style="font-family:'Syne',sans-serif;font-size:17px;font-weight:800">Select Post & Keywords</h3>
+        <p id="postModalSubtitle" style="font-size:12.5px;color:var(--text2);margin-top:2px">Choose posts and set keyword triggers</p>
+      </div>
+      <button onclick="closePostKwModal()" style="background:var(--surface2);border:1px solid var(--border);color:var(--text2);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px">×</button>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;padding:20px 24px">
+
+      <!-- Posts grid -->
+      <div style="margin-bottom:8px;font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px">
+        Recent Posts <span style="color:var(--text3);font-weight:400;text-transform:none;font-size:11px">· Select one or leave blank for all posts</span>
+      </div>
+
+      <div id="postsLoadingState" style="text-align:center;padding:30px;color:var(--text3);font-size:13px;display:none">
+        Loading posts...
+      </div>
+      <div id="postsErrorState" style="text-align:center;padding:20px;color:var(--red);font-size:13px;display:none"></div>
+
+      <div id="postsGridContainer" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px">
+        <!-- Posts injected by JS -->
+        <div onclick="selectPostCard(this,'__all')" data-post-id="__all" style="
+          border-radius:8px;border:2px solid transparent;cursor:pointer;
+          background:var(--surface2);aspect-ratio:1;display:flex;
+          align-items:center;justify-content:center;flex-direction:column;gap:4px;
+          transition:all 0.15s;color:var(--text3);font-size:11px;position:relative
+        ">
+          <span style="font-size:20px">📋</span><span>All Posts</span>
+          <div class="post-check-badge" style="display:none;position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:white;font-size:11px;font-weight:700;align-items:center;justify-content:center">✓</div>
+        </div>
+      </div>
+
+      <!-- Trigger config -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:12px;font-weight:500;color:var(--text2)">Trigger On</label>
+          <select id="pkTriggerOn" class="form-input">
+            <option value="both">DMs + Comments</option>
+            <option value="comment">Comments only</option>
+            <option value="dm">DMs only</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <label style="font-size:12px;font-weight:500;color:var(--text2)">Link to Flow</label>
+          <select id="pkFlowId" class="form-input">
+            <option value="">— No flow —</option>
+            <!-- Populated dynamically or from server -->
+          </select>
+        </div>
+      </div>
+
+      <!-- Keyword tagger -->
+      <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:12px">
+        <label style="font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;display:block;margin-bottom:10px">Keywords to Trigger Automation</label>
+        <div id="pkTagWrap" onclick="document.getElementById('pkTagInput').focus()" style="
+          display:flex;flex-wrap:wrap;gap:6px;
+          background:var(--surface);border:1px solid var(--border);
+          border-radius:8px;padding:8px;min-height:48px;cursor:text;
+          transition:border-color 0.15s;
+        " onfocus="this.style.borderColor='var(--accent)'">
+        </div>
+        <input id="pkTagInput" type="text" placeholder="Type keyword → press Enter or comma to add..." style="
+          width:100%;background:none;border:none;outline:none;color:var(--text);
+          font-size:13px;font-family:inherit;padding:6px 4px;margin-top:4px
+        " onkeydown="handlePkInput(event)" onblur="flushPkInput()">
+        <p style="font-size:11.5px;color:var(--text3);margin-top:6px">When users type these in comments/DMs, your automation triggers.</p>
+      </div>
+
+      <!-- Quick suggestions -->
+      <div>
+        <span style="font-size:11.5px;color:var(--text3)">Quick add:</span>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+          <% ['price', 'FREE', 'link', 'how much', 'buy', 'info', 'interested', 'details', 'where', 'DM me'].forEach(function(s) { %>
+          <button onclick="pkAddKw('<%= s %>')" style="
+            background:var(--surface3);border:1px solid var(--border);
+            border-radius:20px;padding:4px 10px;font-size:12px;
+            color:var(--text2);cursor:pointer;transition:all 0.15s;font-family:inherit
+          " onmouseover="this.style.borderColor='var(--accent2)';this.style.color='var(--text)'"
+             onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--text2)'">
+            <%= s %>
+          </button>
+          <% }) %>
+        </div>
+      </div>
+
+    </div>
+
+    <div style="padding:16px 24px;border-top:1px solid var(--border);flex-shrink:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <span id="pkSummary" style="font-size:12.5px;color:var(--text2)">0 keywords · no post selected</span>
+        <div style="display:flex;gap:8px">
+          <button onclick="closePostKwModal()" class="btn-ghost" style="padding:9px 16px;font-size:13px">Cancel</button>
+          <button onclick="savePkTrigger()" id="pkSaveBtn" class="btn-primary" style="padding:9px 18px;font-size:13px">Save Keywords</button>
+        </div>
+      </div>
+      <div id="pkAlert" style="display:none;margin-top:10px;padding:10px 13px;border-radius:8px;font-size:13px"></div>
+    </div>
+  </div>
+</div>
+
+<style>
+.ig-method-tab.active { background: var(--surface3) !important; color: var(--text) !important; }
+@keyframes slideUp { from { opacity:0;transform:translateY(24px) } to { opacity:1;transform:none } }
+</style>
+
+<script>
+// ── Connect modal ──
+function openIgModal() {
+  const m = document.getElementById('igConnectModal');
+  m.style.display = 'flex';
+}
+function closeIgModal() {
+  document.getElementById('igConnectModal').style.display = 'none';
+}
+
+function switchIgTab(name, btn) {
+  document.querySelectorAll('.ig-tab-panel').forEach(p => p.style.display='none');
+  document.querySelectorAll('.ig-method-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById(name).style.display = 'block';
+  if (btn) btn.classList.add('active');
+}
+
+async function connectIgToken() {
+  const token = document.getElementById('igTokenInput').value.trim();
+  const btn = document.getElementById('igTokenBtn');
+  const alert = document.getElementById('igTokenAlert');
+
+  if (!token) { showIgAlert(alert, 'error', 'Please paste your access token.'); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:6px"></span>Connecting...';
+
+  try {
+    const res = await fetch('/instagram/connect/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ access_token: token }),
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      showIgAlert(alert, 'success', `✅ Connected! ${data.accounts.map(a => '@' + a.username).join(', ')}`);
+      setTimeout(() => window.location.reload(), 1500);
+    } else {
+      showIgAlert(alert, 'error', data.error || 'Connection failed.');
+    }
+  } catch (e) {
+    showIgAlert(alert, 'error', 'Network error. Please try again.');
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Connect Instagram Account';
+}
+
+function showIgAlert(el, type, msg) {
+  el.style.display = 'block';
+  el.style.background = type === 'success' ? 'rgba(74,222,128,0.1)' : 'rgba(248,113,113,0.1)';
+  el.style.border = `1px solid ${type === 'success' ? 'rgba(74,222,128,0.2)' : 'rgba(248,113,113,0.2)'}`;
+  el.style.color = type === 'success' ? '#86efac' : '#fca5a5';
+  el.textContent = msg;
+}
+
+// ── Post + keyword modal ──
+let pkAccountId = null, pkSelectedPost = null, pkKeywords = [];
+
+function openPostSelector(accountId, username) {
+  pkAccountId = accountId;
+  pkSelectedPost = null;
+  pkKeywords = [];
+  renderPkTags();
+  document.getElementById('postModalSubtitle').textContent = username || 'Choose posts and set keyword triggers';
+  document.getElementById('pkSummary').textContent = '0 keywords · no post selected';
+  document.getElementById('pkAlert').style.display = 'none';
+  document.getElementById('postKwModal').style.display = 'flex';
+
+  // Load real posts
+  loadAccountPosts(accountId);
+
+  // Load flows into select
+  loadFlowsSelect();
+}
+
+function closePostKwModal() {
+  document.getElementById('postKwModal').style.display = 'none';
+}
+
+async function loadAccountPosts(accountId) {
+  const grid = document.getElementById('postsGridContainer');
+  const loading = document.getElementById('postsLoadingState');
+  const errState = document.getElementById('postsErrorState');
+
+  loading.style.display = 'block';
+  errState.style.display = 'none';
+
+  try {
+    const res = await fetch(`/instagram/posts/${accountId}`);
+    const data = await res.json();
+    loading.style.display = 'none';
+
+    if (data.success && data.posts.length > 0) {
+      // Render real posts
+      const allCard = grid.querySelector('[data-post-id="__all"]');
+      grid.innerHTML = '';
+      grid.appendChild(allCard);
+
+      data.posts.slice(0, 11).forEach(post => {
+        const card = document.createElement('div');
+        card.setAttribute('data-post-id', post.id);
+        card.onclick = () => selectPostCard(card, post.id);
+        card.style.cssText = `border-radius:8px;border:2px solid transparent;cursor:pointer;background:var(--surface2);aspect-ratio:1;overflow:hidden;position:relative;transition:all 0.15s`;
+
+        const imgUrl = post.thumbnail_url || post.media_url;
+        if (imgUrl) {
+          card.innerHTML = `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover">`;
+        } else {
+          card.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:22px">${post.media_type === 'VIDEO' ? '📹' : '🖼️'}</div>`;
+        }
+        card.innerHTML += `<div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.6),transparent);opacity:0;transition:opacity 0.15s;display:flex;align-items:flex-end;padding:6px"><span style="font-size:10px;color:rgba(255,255,255,0.9)">💬 ${post.comments_count||0}</span></div>`;
+        card.innerHTML += `<div class="post-check-badge" style="display:none;position:absolute;top:6px;right:6px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:white;font-size:11px;font-weight:700;align-items:center;justify-content:center">✓</div>`;
+        grid.appendChild(card);
+      });
+    } else if (!data.success) {
+      errState.textContent = data.error || 'Could not load posts. Token may be expired.';
+      errState.style.display = 'block';
+    }
+  } catch (e) {
+    loading.style.display = 'none';
+    errState.textContent = 'Failed to load posts.';
+    errState.style.display = 'block';
+  }
+}
+
+async function loadFlowsSelect() {
+  try {
+    const res = await fetch('/api/flows/list');
+    if (!res.ok) return;
+    const data = await res.json();
+    const sel = document.getElementById('pkFlowId');
+    sel.innerHTML = '<option value="">— No flow —</option>';
+    (data.flows || []).forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.id; opt.textContent = f.name;
+      sel.appendChild(opt);
+    });
+  } catch (e) { /* flows not critical */ }
+}
+
+function selectPostCard(card, postId) {
+  document.querySelectorAll('#postsGridContainer > div').forEach(c => {
+    c.style.borderColor = 'transparent';
+    const badge = c.querySelector('.post-check-badge');
+    if (badge) badge.style.display = 'none';
+    const overlay = c.querySelector('div[style*="gradient"]');
+    if (overlay) overlay.style.opacity = '0';
+  });
+
+  card.style.borderColor = 'var(--accent)';
+  const badge = card.querySelector('.post-check-badge');
+  if (badge) { badge.style.display = 'flex'; }
+  pkSelectedPost = postId === '__all' ? null : postId;
+  updatePkSummary();
+}
+
+// ── Keyword tagger ──
+function handlePkInput(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = document.getElementById('pkTagInput').value.trim().replace(/,$/,'');
+    if (val) pkAddKw(val);
+  } else if (e.key === 'Backspace' && !document.getElementById('pkTagInput').value && pkKeywords.length) {
+    pkRemoveKw(pkKeywords[pkKeywords.length-1]);
+  }
+}
+
+function flushPkInput() {
+  const val = document.getElementById('pkTagInput').value.trim().replace(/,$/,'');
+  if (val) pkAddKw(val);
+}
+
+function pkAddKw(kw) {
+  const clean = kw.toLowerCase().trim();
+  if (!clean || pkKeywords.includes(clean)) return;
+  pkKeywords.push(clean);
+  renderPkTags();
+  document.getElementById('pkTagInput').value = '';
+  updatePkSummary();
+}
+
+function pkRemoveKw(kw) {
+  pkKeywords = pkKeywords.filter(k => k !== kw);
+  renderPkTags();
+  updatePkSummary();
+}
+
+function renderPkTags() {
+  const wrap = document.getElementById('pkTagWrap');
+  wrap.querySelectorAll('.pk-tag').forEach(t => t.remove());
+  const input = document.getElementById('pkTagInput');
+  pkKeywords.forEach(kw => {
+    const tag = document.createElement('div');
+    tag.className = 'pk-tag';
+    tag.style.cssText = 'display:flex;align-items:center;gap:5px;background:rgba(124,92,252,0.15);color:var(--accent2);border-radius:20px;padding:4px 10px;font-size:12.5px;font-weight:500';
+    tag.innerHTML = `<span>${kw}</span><button onclick="pkRemoveKw('${kw}')" style="background:none;border:none;color:var(--accent2);cursor:pointer;font-size:15px;line-height:1;padding:0;font-family:inherit">×</button>`;
+    wrap.insertBefore(tag, input.parentNode === wrap ? input : null);
+    wrap.appendChild(tag);
+  });
+}
+
+function updatePkSummary() {
+  const postText = pkSelectedPost ? `Post: ${pkSelectedPost.slice(-8)}` : 'All posts';
+  document.getElementById('pkSummary').textContent = `${pkKeywords.length} keyword${pkKeywords.length!==1?'s':''} · ${postText}`;
+}
+
+async function savePkTrigger() {
+  if (pkKeywords.length === 0) {
+    const a = document.getElementById('pkAlert');
+    a.style.display='block'; a.style.background='rgba(248,113,113,0.1)'; a.style.border='1px solid rgba(248,113,113,0.2)'; a.style.color='#fca5a5'; a.style.borderRadius='8px'; a.style.padding='10px 13px'; a.style.fontSize='13px';
+    a.textContent = 'Please add at least one keyword.';
+    return;
+  }
+
+  const btn = document.getElementById('pkSaveBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:5px"></span>Saving...';
+
+  try {
+    const res = await fetch('/instagram/post-trigger', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ig_account_id: pkAccountId,
+        ig_post_id: pkSelectedPost,
+        keywords: pkKeywords,
+        flow_id: document.getElementById('pkFlowId').value || null,
+        trigger_on: document.getElementById('pkTriggerOn').value,
+      }),
+    });
+    const data = await res.json();
+
+    const a = document.getElementById('pkAlert');
+    a.style.display = 'block';
+    a.style.borderRadius = '8px'; a.style.padding = '10px 13px'; a.style.fontSize = '13px';
+    if (data.success) {
+      a.style.background='rgba(74,222,128,0.1)'; a.style.border='1px solid rgba(74,222,128,0.2)'; a.style.color='#86efac';
+      a.textContent = `✅ ${pkKeywords.length} keyword(s) saved! Automation triggers are active.`;
+      setTimeout(() => closePostKwModal(), 1600);
+    } else {
+      a.style.background='rgba(248,113,113,0.1)'; a.style.border='1px solid rgba(248,113,113,0.2)'; a.style.color='#fca5a5';
+      a.textContent = data.error || 'Save failed.';
+    }
+  } catch (e) {
+    const a = document.getElementById('pkAlert');
+    a.style.display='block'; a.textContent='Network error.';
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Save Keywords';
+}
+
+// Auto-open tab from URL
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('tab') === 'instagram') {
+  document.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.settings-tab').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-instagram').classList.add('active');
+  const btn = Array.from(document.querySelectorAll('.settings-tab')).find(b => b.textContent.trim() === 'Instagram');
+  if (btn) btn.classList.add('active');
+}
+</script>

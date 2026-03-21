@@ -61,7 +61,7 @@ const sessionConfig = {
   saveUninitialized: false,
   name: 'fg.sid',
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.NODE_ENV === 'production' && process.env.APP_URL?.startsWith('https'),
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     sameSite: 'lax',
@@ -99,6 +99,7 @@ app.use('/analytics', require('./routes/analytics'));
 app.use('/billing', require('./routes/billing'));
 app.use('/settings', require('./routes/settings'));
 app.use('/admin', require('./routes/admin'));
+app.use('/instagram', require('./routes/instagram'));
 app.use('/api/webhooks', require('./routes/webhooks'));
 app.use('/api', require('./routes/api'));
 
@@ -116,6 +117,16 @@ app.get('/health', async (req, res) => {
   } catch (e) {
     res.status(500).json({ status: 'error', db: 'down' });
   }
+});
+
+// ── Session Test ──────────────────────────────────────────────────────────
+app.get('/test-session', (req, res) => {
+  res.json({ 
+    session: req.session, 
+    user: req.session?.user || null,
+    sessionID: req.sessionID,
+    hasCookie: !!req.cookies['fg.sid']
+  });
 });
 
 // ── 404 ───────────────────────────────────────────────────────────────────

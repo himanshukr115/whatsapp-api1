@@ -2,7 +2,24 @@
 const logger = require('../utils/logger');
 
 exports.requireAuth = (req, res, next) => {
-  if (req.session && req.session.user) return next();
+  logger.info('Auth check', { 
+    path: req.path,
+    hasSession: !!req.session, 
+    hasUser: !!req.session?.user,
+    userId: req.session?.user?.id || null,
+    sessionID: req.sessionID,
+    cookies: req.cookies ? Object.keys(req.cookies) : []
+  });
+  
+  if (req.session && req.session.user) {
+    logger.info('Auth passed', { userId: req.session.user.id });
+    return next();
+  }
+  
+  logger.warn('Auth rejected - no user in session', { 
+    path: req.path,
+    sessionID: req.sessionID
+  });
   req.flash('error', 'Please log in to continue.');
   return res.redirect('/auth/login');
 };

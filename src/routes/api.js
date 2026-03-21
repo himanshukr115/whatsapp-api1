@@ -53,4 +53,28 @@ router.get('/usage', requireAuth, async (req, res) => {
   });
 });
 
+
+
+// Flows list for keyword dropdowns
+router.get('/flows/list', requireAuth, async (req, res) => {
+  try {
+    const flows = await db.query(
+      'SELECT id, name, trigger_type FROM flows WHERE user_id=$1 ORDER BY name',
+      [req.session.user.id]
+    );
+    res.json({ flows: flows.rows });
+  } catch (err) {
+    res.json({ flows: [] });
+  }
+});
+// ```
+
+// ---
+
+// ## Step 4 — Add the Instagram Settings Tab
+
+// First, copy `instagram_tab.ejs` into your project at:
+// ```
+// views/settings/instagram_tab.ejs
+
 module.exports = router;

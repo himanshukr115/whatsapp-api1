@@ -145,14 +145,21 @@ exports.login = async (req, res) => {
     logger.info('User logged in', { userId: user.id, email });
     req.session.save((err) => {
       if (err) {
-        logger.error('Session save error', { error: err.message });
+        logger.error('Session save error', { error: err.message, stack: err.stack });
         return res.render('auth/login', {
           layout: 'layouts/auth', title: 'Login',
           errors: ['Session error. Please try again.'], formData: { email }
         });
       }
+      logger.info('Session saved successfully', { userId: user.id, sessionId: req.sessionID });
+      logger.info('Session contents before redirect', { user: req.session.user });
+      logger.info('About to redirect to /dashboard', { userId: user.id, statusCode: 302 });
       req.flash('success', `Welcome back, ${user.full_name}!`);
-      res.redirect('/dashboard');
+      logger.info('Response headers before redirect', { 
+        'set-cookie': res.getHeader('set-cookie'),
+        location: '/dashboard'
+      });
+      res.redirect(302, '/dashboard');
     });
   } catch (err) {
     logger.error('Login error', { error: err.message });

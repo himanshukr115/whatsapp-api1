@@ -72,46 +72,7 @@
   </div>
 
   <!-- Instagram -->
-  <div class="settings-panel" id="tab-instagram">
-    <div class="card">
-      <div class="card-header">
-        <h3 class="settings-section-title">Connected Instagram Accounts</h3>
-      </div>
-      <% if (igAccounts.length === 0) { %>
-      <div class="empty-state">
-        <p>No Instagram accounts connected yet.</p>
-        <p style="margin-top:8px;font-size:13px;color:var(--text2)">To connect an account, you need a <strong>Meta Business Account</strong> with Instagram API access approved by Meta. Once approved, paste your access token below.</p>
-      </div>
-      <% } else { %>
-      <% igAccounts.forEach(acc => { %>
-      <div class="ig-account-row">
-        <div class="ig-avatar-sm"><%= acc.username.charAt(0).toUpperCase() %></div>
-        <div class="ig-account-info">
-          <strong>@<%= acc.username %></strong>
-          <span class="ig-followers"><%= (acc.followers_count || 0).toLocaleString('en-IN') %> followers</span>
-        </div>
-        <span class="badge <%= acc.is_active ? 'badge-green' : 'badge-red' %>">
-          <%= acc.is_active ? 'Connected' : 'Disconnected' %>
-        </span>
-        <form action="/settings/ig/<%= acc.id %>/disconnect" method="POST" onsubmit="return confirm('Disconnect this account?')">
-          <button class="btn-sm-danger">Disconnect</button>
-        </form>
-      </div>
-      <% }) %>
-      <% } %>
-
-      <div class="info-banner" style="margin-top:20px">
-        <strong>📋 How to connect Instagram:</strong>
-        <ol style="margin-top:8px;padding-left:20px;line-height:2;font-size:13px">
-          <li>Create a <a href="https://developers.facebook.com" target="_blank">Meta Developer App</a></li>
-          <li>Add the Instagram Graph API product</li>
-          <li>Get Advanced Access approved by Meta</li>
-          <li>Generate a long-lived Page Access Token</li>
-          <li>Use <code>/api/ig/connect</code> endpoint with your token</li>
-        </ol>
-      </div>
-    </div>
-  </div>
+<%- include('instagram_tab') %>
 
   <!-- Danger Zone -->
   <div class="settings-panel" id="tab-danger">
