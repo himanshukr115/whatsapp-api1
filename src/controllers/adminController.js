@@ -3,7 +3,7 @@ const logger = require('../utils/logger');
 
 exports.index = async (req, res) => {
   try {
-    const [summary, recentUsers, paidUsers] = await Promise.all([
+    const [summary, recentUsers, paidUsers, plans] = await Promise.all([
       db.query(`
         SELECT
           (SELECT COUNT(*)::int FROM users) AS total_users,
@@ -33,6 +33,11 @@ exports.index = async (req, res) => {
         ORDER BY p.created_at DESC
         LIMIT 20
       `),
+      db.query(`
+        SELECT id, name, slug, price_monthly, price_yearly, dm_limit, flow_limit, ig_accounts, is_active, sort_order
+        FROM plans
+        ORDER BY sort_order ASC, created_at ASC
+      `),
     ]);
 
     return res.render('admin/index', {
@@ -41,10 +46,69 @@ exports.index = async (req, res) => {
       stats: summary.rows[0],
       recentUsers: recentUsers.rows,
       paidUsers: paidUsers.rows,
+      plans: plans.rows,
     });
   } catch (error) {
     logger.error('Admin dashboard error', { error: error.message });
     req.flash('error', 'Unable to load admin dashboard right now.');
     return res.redirect('/dashboard');
   }
+};
+
+exports.createPlan = async (req, res) => {
+  const {
+    name,
+    slug,
+    price_monthly,
+    price_yearly,
+    dm_limit,
+    flow_limit,
+    ig_accounts,
+    sort_order,
+    features,
+  } = req.body;
+
+  const normalizedSlug = (slug || '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+
+  if (!name || !normalizedSlug) {
+    req.flash('error', 'Plan name and slug are required.');
+    return res.redirect('/admin');
+  }
+
+  const toInt = (value, fallback = 0) => {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? fallback : parsed;
+  };
+
+  const parsedFeatures = (features || '')
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  try {
+    await db.query(`
+      INSERT INTO plans (name, slug, price_monthly, price_yearly, dm_limit, flow_limit, ig_accounts, sort_order, features, is_active)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, TRUE)
+    `, [
+      name.trim(),
+      normalizedSlug,
+      Math.max(0, toInt(price_monthly)),
+      Math.max(0, toInt(price_yearly)),
+      Math.max(0, toInt(dm_limit, 1000)),
+      Math.max(0, toInt(flow_limit, 3)),
+      Math.max(0, toInt(ig_accounts, 1)),
+      toInt(sort_order, 0),
+      JSON.stringify(parsedFeatures),
+    ]);
+    req.flash('success', `Plan "${name.trim()}" created successfully.`);
+  } catch (error) {
+    logger.error('Create plan error', { error: error.message, slug: normalizedSlug });
+    req.flash('error', 'Could not create plan. Ensure slug is unique.');
+  }
+  return res.redirect('/admin');
 };
