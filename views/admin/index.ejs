@@ -6,121 +6,111 @@
   <div class="card stat"><h3>Revenue</h3><p>₹<%= Number(stats.revenue_captured || 0).toLocaleString() %></p></div>
 </section>
 
-<section class="card" style="margin-top:18px; overflow:auto;">
+<section class="card table-card" style="margin-top:18px;">
   <h3 style="margin-bottom:10px;">Latest Registrations</h3>
-  <table class="table">
-    <thead><tr><th>Name</th><th>Email</th><th>Business</th><th>Role</th><th>Registered</th><th>Last Login</th></tr></thead>
-    <tbody>
-      <% recentUsers.forEach((user) => { %>
-        <tr>
-          <td><%= user.full_name %></td>
-          <td><%= user.email %></td>
-          <td><%= user.business_name || '—' %></td>
-          <td>
-            <form action="/admin/users/<%= user.id %>/role" method="POST" style="display:flex;gap:8px;align-items:center;">
-              <select name="role" class="form-select" style="min-width:130px;padding:6px 10px;">
-                <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
-                <option value="moderator" <%= user.role === 'moderator' ? 'selected' : '' %>>Moderator</option>
-                <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
-              </select>
-              <button class="btn-sm-ghost" type="submit">Save</button>
-            </form>
-          </td>
-          <td><%= new Date(user.created_at).toLocaleString() %></td>
-          <td><%= user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never' %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table class="table data-table">
+      <thead><tr><th>Name</th><th>Email</th><th>Business</th><th>Role</th><th>Registered</th><th>Last Login</th></tr></thead>
+      <tbody>
+        <% recentUsers.forEach((user) => { %>
+          <tr>
+            <td><%= user.full_name %></td>
+            <td><%= user.email %></td>
+            <td><%= user.business_name || '—' %></td>
+            <td>
+              <form action="/admin/users/<%= user.id %>/role" method="POST" style="display:flex;gap:8px;align-items:center;">
+                <select name="role" class="form-select" style="min-width:130px;padding:6px 10px;">
+                  <option value="user" <%= user.role === 'user' ? 'selected' : '' %>>User</option>
+                  <option value="moderator" <%= user.role === 'moderator' ? 'selected' : '' %>>Moderator</option>
+                  <option value="admin" <%= user.role === 'admin' ? 'selected' : '' %>>Admin</option>
+                </select>
+                <button class="btn-sm-ghost" type="submit">Save</button>
+              </form>
+            </td>
+            <td><%= new Date(user.created_at).toLocaleString() %></td>
+            <td><%= user.last_login_at ? new Date(user.last_login_at).toLocaleString() : 'Never' %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
 </section>
 
 <section class="card" style="margin-top:18px;">
   <h3 style="margin-bottom:12px;">Create Plan</h3>
   <form action="/admin/plans" method="POST" class="auth-form" style="max-width:none;">
     <div class="form-row-2">
-      <div class="form-group">
-        <label class="form-label">Plan Name *</label>
-        <input class="form-input" name="name" required placeholder="Starter Pro">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Slug *</label>
-        <input class="form-input" name="slug" required placeholder="starter-pro">
-      </div>
+      <div class="form-group"><label class="form-label">Plan Name *</label><input class="form-input" name="name" required placeholder="Starter Pro"></div>
+      <div class="form-group"><label class="form-label">Slug *</label><input class="form-input" name="slug" required placeholder="starter-pro"></div>
     </div>
     <div class="form-row-2">
-      <div class="form-group">
-        <label class="form-label">Monthly Price (paise)</label>
-        <input class="form-input" name="price_monthly" type="number" min="0" value="0">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Yearly Price (paise)</label>
-        <input class="form-input" name="price_yearly" type="number" min="0" value="0">
-      </div>
+      <div class="form-group"><label class="form-label">Monthly Price (paise)</label><input class="form-input" name="price_monthly" type="number" min="0" value="0"></div>
+      <div class="form-group"><label class="form-label">Yearly Discount (%)</label><input class="form-input" name="yearly_discount_percent" type="number" min="0" max="100" value="17"></div>
     </div>
     <div class="form-row-2">
-      <div class="form-group">
-        <label class="form-label">DM Limit</label>
-        <input class="form-input" name="dm_limit" type="number" min="0" value="1000">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Flow Limit</label>
-        <input class="form-input" name="flow_limit" type="number" min="0" value="3">
-      </div>
+      <div class="form-group"><label class="form-label">Yearly Price (paise)</label><input class="form-input" name="price_yearly" type="number" min="0" value="0"></div>
+      <div class="form-group"><label class="form-label">Sort Order</label><input class="form-input" name="sort_order" type="number" value="0"></div>
     </div>
     <div class="form-row-2">
-      <div class="form-group">
-        <label class="form-label">Instagram Accounts</label>
-        <input class="form-input" name="ig_accounts" type="number" min="0" value="1">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Sort Order</label>
-        <input class="form-input" name="sort_order" type="number" value="0">
-      </div>
+      <div class="form-group"><label class="form-label">DM Limit</label><input class="form-input" name="dm_limit" type="number" min="0" value="1000"></div>
+      <div class="form-group"><label class="form-label">Flow Limit</label><input class="form-input" name="flow_limit" type="number" min="0" value="3"></div>
     </div>
-    <div class="form-group">
-      <label class="form-label">Features (one per line)</label>
-      <textarea class="form-input" name="features" rows="4" placeholder="Unlimited replies&#10;Priority support"></textarea>
+    <div class="form-row-2">
+      <div class="form-group"><label class="form-label">Instagram Accounts</label><input class="form-input" name="ig_accounts" type="number" min="0" value="1"></div>
     </div>
+    <div class="form-group"><label class="form-label">Features (one per line)</label><textarea class="form-input" name="features" rows="4" placeholder="Unlimited replies&#10;Priority support"></textarea></div>
     <button class="btn-auth" type="submit">Create Plan</button>
   </form>
 </section>
 
-<section class="card" style="margin-top:18px; overflow:auto;">
+<section class="card table-card" style="margin-top:18px;">
   <h3 style="margin-bottom:10px;">Existing Plans</h3>
-  <table class="table">
-    <thead><tr><th>Name</th><th>Slug</th><th>Monthly</th><th>Yearly</th><th>DM</th><th>Flows</th><th>IG</th><th>Active</th></tr></thead>
-    <tbody>
-      <% plans.forEach((plan) => { %>
-        <tr>
-          <td><%= plan.name %></td>
-          <td><%= plan.slug %></td>
-          <td><%= plan.price_monthly %></td>
-          <td><%= plan.price_yearly %></td>
-          <td><%= plan.dm_limit %></td>
-          <td><%= plan.flow_limit %></td>
-          <td><%= plan.ig_accounts %></td>
-          <td><%= plan.is_active ? 'Yes' : 'No' %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table class="table data-table">
+      <thead><tr><th>Name</th><th>Slug</th><th>Monthly</th><th>Yearly</th><th>Discount</th><th>DM</th><th>Flows</th><th>IG</th><th>Active</th><th>Action</th></tr></thead>
+      <tbody>
+        <% plans.forEach((plan) => { %>
+          <tr>
+            <td colspan="10">
+              <form action="/admin/plans/<%= plan.id %>/update" method="POST" class="admin-plan-row">
+                <input class="form-input" name="name" value="<%= plan.name %>" required>
+                <span class="form-hint" style="align-self:center"><%= plan.slug %></span>
+                <input class="form-input" name="price_monthly" type="number" min="0" value="<%= plan.price_monthly %>">
+                <input class="form-input" name="price_yearly" type="number" min="0" value="<%= plan.price_yearly %>">
+                <input class="form-input" name="yearly_discount_percent" type="number" min="0" max="100" value="<%= plan.yearly_discount_percent || 0 %>">
+                <input class="form-input" name="dm_limit" type="number" min="0" value="<%= plan.dm_limit %>">
+                <input class="form-input" name="flow_limit" type="number" min="0" value="<%= plan.flow_limit %>">
+                <input class="form-input" name="ig_accounts" type="number" min="0" value="<%= plan.ig_accounts %>">
+                <label style="display:flex;align-items:center;gap:6px;font-size:12px;">
+                  <input type="checkbox" name="is_active" value="true" <%= plan.is_active ? 'checked' : '' %>> Active
+                </label>
+                <input class="form-input" name="sort_order" type="number" value="<%= plan.sort_order %>">
+                <div style="display:flex;gap:6px;">
+                  <button class="btn-sm-ghost" type="submit">Save</button>
+                  <button class="btn-sm-danger" type="submit" formaction="/admin/plans/<%= plan.id %>/delete" formmethod="POST" data-confirm="Delete this plan?">Delete</button>
+                </div>
+              </form>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
 </section>
 
-<section class="card" style="margin-top:18px; overflow:auto;">
+<section class="card table-card" style="margin-top:18px;">
   <h3 style="margin-bottom:10px;">Recent Plan Payments</h3>
-  <table class="table">
-    <thead><tr><th>User</th><th>Email</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
-    <tbody>
-      <% paidUsers.forEach((payment) => { %>
-        <tr>
-          <td><%= payment.full_name %></td>
-          <td><%= payment.email %></td>
-          <td><%= payment.plan_name || 'N/A' %></td>
-          <td><%= payment.currency %> <%= Number(payment.amount || 0).toLocaleString() %></td>
-          <td><%= payment.status %></td>
-          <td><%= new Date(payment.created_at).toLocaleString() %></td>
-        </tr>
-      <% }) %>
-    </tbody>
-  </table>
+  <div class="table-wrap">
+    <table class="table data-table">
+      <thead><tr><th>User</th><th>Email</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+      <tbody>
+        <% paidUsers.forEach((payment) => { %>
+          <tr>
+            <td><%= payment.full_name %></td><td><%= payment.email %></td><td><%= payment.plan_name || 'N/A' %></td>
+            <td><%= payment.currency %> <%= Number(payment.amount || 0).toLocaleString() %></td><td><%= payment.status %></td><td><%= new Date(payment.created_at).toLocaleString() %></td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
 </section>

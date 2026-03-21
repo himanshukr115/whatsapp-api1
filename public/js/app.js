@@ -1,32 +1,36 @@
 // public/js/app.js — FlowGram Client JS
 
-// Load Chart.js from CDN if not already loaded
-(function() {
+(function loadChartJsIfNeeded() {
   if (typeof Chart === 'undefined') {
-    const s = document.createElement('script');
-    s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
-    s.async = true;
-    document.head.appendChild(s);
+    const scriptEl = document.createElement('script');
+    scriptEl.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
+    scriptEl.async = true;
+    document.head.appendChild(scriptEl);
   }
 })();
 
-// Auto-dismiss alerts after 6 seconds
 document.addEventListener('DOMContentLoaded', () => {
-  const alerts = document.querySelectorAll('.alert');
-  alerts.forEach(alert => {
+  document.querySelectorAll('.alert').forEach((alertEl) => {
     setTimeout(() => {
-      alert.style.transition = 'opacity 0.5s';
-      alert.style.opacity = '0';
-      setTimeout(() => alert.remove(), 500);
+      alertEl.style.transition = 'opacity 0.5s';
+      alertEl.style.opacity = '0';
+      setTimeout(() => alertEl.remove(), 500);
     }, 6000);
   });
-});
 
-// Confirm delete forms
-document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('[data-confirm]').forEach(el => {
-    el.addEventListener('submit', e => {
-      if (!confirm(el.dataset.confirm)) e.preventDefault();
+  document.querySelectorAll('[data-confirm]').forEach((el) => {
+    if (el.tagName === 'FORM') {
+      el.addEventListener('submit', (event) => {
+        if (!window.confirm(el.dataset.confirm)) event.preventDefault();
+      });
+      return;
+    }
+
+    el.addEventListener('click', (event) => {
+      if (!window.confirm(el.dataset.confirm)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
     });
   });
 });

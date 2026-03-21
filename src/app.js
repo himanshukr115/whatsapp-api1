@@ -104,9 +104,46 @@ app.use('/api/webhooks', require('./routes/webhooks'));
 app.use('/api', require('./routes/api'));
 
 // ── Landing page ──────────────────────────────────────────────────────────
-app.get('/', (req, res) => {
+app.get('/', async (req, res) => {
   if (req.session.user) return res.redirect('/dashboard');
-  res.render('landing', { layout: 'layouts/public', title: 'FlowGram — Instagram Automation for Creators' });
+
+  try {
+    const { rows } = await pool.query(`
+      SELECT name, slug, price_monthly, price_yearly, features,
+             GREATEST(0, LEAST(100, COALESCE(yearly_discount_percent,
+               CASE WHEN price_monthly > 0 AND price_yearly > 0
+                 THEN ROUND((1 - (price_yearly::numeric / (price_monthly::numeric * 12))) * 100)
+                 ELSE 0
+               END
+             )))::int AS yearly_discount_percent
+      FROM plans
+      WHERE is_active = TRUE
+      ORDER BY sort_order ASC, created_at ASC
+    `);
+
+    const plans = rows.length ? rows : [
+      { name: 'Free', slug: 'free', price_monthly: 0, price_yearly: 0, features: ['1,000 DMs per month', '3 active flows', '1 Instagram account', 'Basic analytics', 'Email support'], yearly_discount_percent: 0 },
+    ];
+
+    const maxDiscount = plans.reduce((max, plan) => Math.max(max, plan.yearly_discount_percent || 0), 0);
+
+    return res.render('landing', {
+      layout: 'layouts/public',
+      title: 'FlowGram — Instagram Automation for Creators',
+      plans,
+      maxDiscount,
+    });
+  } catch (error) {
+    logger.error('Landing page error', { error: error.message });
+    return res.render('landing', {
+      layout: 'layouts/public',
+      title: 'FlowGram — Instagram Automation for Creators',
+      plans: [
+        { name: 'Free', slug: 'free', price_monthly: 0, price_yearly: 0, features: ['1,000 DMs per month', '3 active flows', '1 Instagram account', 'Basic analytics', 'Email support'], yearly_discount_percent: 0 },
+      ],
+      maxDiscount: 0,
+    });
+  }
 });
 
 // ── Health check ──────────────────────────────────────────────────────────
