@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS plans (
   features      JSONB DEFAULT '[]',
   is_active     BOOLEAN DEFAULT TRUE,
   sort_order    INTEGER DEFAULT 0,
+  yearly_discount_percent INTEGER DEFAULT 0,
   created_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -229,6 +230,8 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─── Backward-compatible alter statements ──────────────────────────────────
+ALTER TABLE plans ADD COLUMN IF NOT EXISTS yearly_discount_percent INTEGER DEFAULT 0;
+UPDATE plans SET yearly_discount_percent = GREATEST(0, LEAST(100, COALESCE(yearly_discount_percent, 0)));
 ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255);
 ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
