@@ -8,7 +8,7 @@
 </div>
 
 <div class="form-card" style="max-width:680px">
-  <form action="/flows" method="POST">
+  <form action="/flows" method="POST" id="createFlowForm">
     <div class="form-group">
       <label class="form-label">Flow Name *</label>
       <input type="text" name="name" class="form-input" placeholder="e.g. Price Inquiry Flow" required>
@@ -20,7 +20,7 @@
     <div class="form-row-2">
       <div class="form-group">
         <label class="form-label">Trigger Type *</label>
-        <select name="trigger_type" class="form-select" required>
+        <select name="trigger_type" class="form-select" id="triggerType" required>
           <option value="">Select trigger...</option>
           <option value="dm_received">DM Received</option>
           <option value="comment_on_post">Comment on Post</option>
@@ -42,9 +42,179 @@
         <% } %>
       </div>
     </div>
+
+    <div class="trigger-config-card hidden" id="commentTriggerConfig">
+      <div class="trigger-config-head">
+        <h4>Comment Trigger Setup</h4>
+        <p>Choose where this automation should listen for comments.</p>
+      </div>
+      <div class="trigger-tabs">
+        <button type="button" class="trigger-tab-btn active" data-tab="specific">Specific Post/Reel</button>
+        <button type="button" class="trigger-tab-btn" data-tab="any">Any Post/Reel</button>
+        <button type="button" class="trigger-tab-btn" data-tab="next">Next Post/Reel</button>
+      </div>
+
+      <div class="trigger-tab-panel active" data-panel="specific">
+        <div class="post-grid" id="postGrid"></div>
+        <div class="form-hint" id="postGridHint">Select an Instagram account to load your latest posts and reels.</div>
+      </div>
+
+      <div class="trigger-tab-panel" data-panel="any">
+        <div class="info-banner" style="margin:0;">
+          This flow will trigger for comments on <strong>any existing or future post/reel</strong> on the selected account.
+        </div>
+      </div>
+
+      <div class="trigger-tab-panel" data-panel="next">
+        <div class="info-banner" style="margin:0;">
+          This flow will wait for comments on your <strong>next published post/reel</strong> only, then keep listening on that post.
+        </div>
+      </div>
+    </div>
+
+    <input type="hidden" name="trigger_config" id="triggerConfigInput" value="{}">
     <div class="form-actions">
       <a href="/flows" class="btn-ghost">Cancel</a>
       <button type="submit" class="btn-primary">Create Flow & Open Builder →</button>
     </div>
   </form>
 </div>
+
+<script>
+  const triggerType = document.getElementById('triggerType');
+  const igAccountSelect = document.querySelector('select[name="ig_account_id"]');
+  const triggerCard = document.getElementById('commentTriggerConfig');
+  const postGrid = document.getElementById('postGrid');
+  const postGridHint = document.getElementById('postGridHint');
+  const triggerConfigInput = document.getElementById('triggerConfigInput');
+  const createFlowForm = document.getElementById('createFlowForm');
+  const tabButtons = [...document.querySelectorAll('.trigger-tab-btn')];
+  const tabPanels = [...document.querySelectorAll('.trigger-tab-panel')];
+
+  let selectedTab = 'specific';
+  let selectedPostId = null;
+  let loadedPosts = [];
+
+  const escapeHtml = (value) => {
+    return (value || '')
+      .toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
+  function setTriggerCardVisibility() {
+    const show = triggerType.value === 'comment_on_post';
+    triggerCard.classList.toggle('hidden', !show);
+    syncTriggerConfig();
+  }
+
+  function switchTab(nextTab) {
+    selectedTab = nextTab;
+    tabButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === nextTab));
+    tabPanels.forEach(panel => panel.classList.toggle('active', panel.dataset.panel === nextTab));
+    syncTriggerConfig();
+  }
+
+  function isReel(post) {
+    return post.media_product_type === 'REELS' || post.media_type === 'VIDEO';
+  }
+
+  function renderPosts(posts) {
+    if (!posts.length) {
+      postGrid.innerHTML = '';
+      postGridHint.textContent = 'No posts/reels found on this account yet.';
+      return;
+    }
+
+    const reels = posts.filter(isReel);
+    const orderedPosts = reels.concat(posts.filter(post => !isReel(post)));
+
+    postGrid.innerHTML = orderedPosts.map(post => {
+      const mediaUrl = post.thumbnail_url || post.media_url || '';
+      const caption = escapeHtml((post.caption || (isReel(post) ? 'Reel' : 'Post')).slice(0, 80));
+      const badge = isReel(post) ? 'Reel' : 'Post';
+      const selectedClass = selectedPostId === post.id ? 'selected' : '';
+
+      return `
+        <button type="button" class="post-option ${selectedClass}" data-post-id="${post.id}">
+          <div class="post-thumb-wrap">
+            ${mediaUrl ? `<img src="${mediaUrl}" alt="${caption}" class="post-thumb" loading="lazy" />` : '<div class="post-thumb post-thumb-placeholder">No preview</div>'}
+            <span class="post-badge">${badge}</span>
+          </div>
+          <span class="post-caption">${caption || 'Untitled'}</span>
+        </button>
+      `;
+    }).join('');
+
+    postGrid.querySelectorAll('.post-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        selectedPostId = btn.dataset.postId;
+        renderPosts(loadedPosts);
+        syncTriggerConfig();
+      });
+    });
+
+    postGridHint.textContent = reels.length
+      ? `Showing ${posts.length} items (${reels.length} reels first).`
+      : `Showing ${posts.length} latest posts.`;
+  }
+
+  async function loadPosts() {
+    const accountId = igAccountSelect.value;
+    selectedPostId = null;
+    loadedPosts = [];
+    postGrid.innerHTML = '';
+    if (!accountId) {
+      postGridHint.textContent = 'Select an Instagram account to load your latest posts and reels.';
+      syncTriggerConfig();
+      return;
+    }
+
+    postGridHint.textContent = 'Loading posts and reels...';
+    try {
+      const res = await fetch(`/instagram/posts/${accountId}`);
+      const data = await res.json();
+      if (!data.success) {
+        postGridHint.textContent = data.error || 'Could not load posts/reels.';
+        return;
+      }
+      loadedPosts = data.posts || [];
+      renderPosts(loadedPosts);
+    } catch (error) {
+      postGridHint.textContent = 'Failed to load posts/reels.';
+    } finally {
+      syncTriggerConfig();
+    }
+  }
+
+  function syncTriggerConfig() {
+    if (triggerType.value !== 'comment_on_post') {
+      triggerConfigInput.value = JSON.stringify({});
+      return;
+    }
+
+    const config = { comment_scope: selectedTab };
+    if (selectedTab === 'specific' && selectedPostId) {
+      config.ig_post_id = selectedPostId;
+    }
+    triggerConfigInput.value = JSON.stringify(config);
+  }
+
+  createFlowForm.addEventListener('submit', (e) => {
+    if (triggerType.value === 'comment_on_post' && selectedTab === 'specific' && !selectedPostId) {
+      e.preventDefault();
+      postGridHint.textContent = 'Please select one post/reel for the "Specific Post/Reel" option.';
+    }
+    syncTriggerConfig();
+  });
+
+  triggerType.addEventListener('change', setTriggerCardVisibility);
+  igAccountSelect.addEventListener('change', loadPosts);
+  tabButtons.forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+
+  setTriggerCardVisibility();
+  if (igAccountSelect.value) loadPosts();
+</script>
